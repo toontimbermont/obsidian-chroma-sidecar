@@ -19,11 +19,11 @@ func main() {
 	)
 	flag.Parse()
 
-	fmt.Println("Obsidian AI Agent starting...")
+	fmt.Println("Obsidian AI ChromaDB Test Utility starting...")
 
 	if *query == "" {
-		log.Println("Application initialized successfully")
-		log.Printf("Usage: %s -query \"your search text\"", "obsidian-ai-agent")
+		log.Println("ChromaDB test utility initialized successfully")
+		log.Printf("Usage: %s -query \"your search text\"", "obsidian-ai-chroma-test-util")
 		return
 	}
 
