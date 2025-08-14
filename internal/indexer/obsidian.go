@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -33,6 +34,8 @@ type ObsidianIndexer struct {
 	vaultPath    string
 	indexFile    string
 	fileIndex    map[string]FileIndex
+	chunkSize    int
+	chunkOverlap int
 }
 
 // Config holds configuration for the Obsidian indexer
@@ -40,6 +43,8 @@ type Config struct {
 	VaultPath string
 	BatchSize int
 	Directories []string
+	ChunkSize int // Target chunk size in characters (default: 2000)
+	ChunkOverlap int // Overlap between chunks in characters (default: 200)
 }
 
 // DefaultConfig returns default indexer configuration
@@ -48,17 +53,21 @@ func DefaultConfig() *Config {
 		VaultPath: ".",
 		BatchSize: 50,
 		Directories: []string{"notes", "projects"},
+		ChunkSize: 2000,
+		ChunkOverlap: 200,
 	}
 }
 
 // NewObsidianIndexer creates a new Obsidian indexer
 func NewObsidianIndexer(client *chroma.Client, config *Config) *ObsidianIndexer {
 	indexer := &ObsidianIndexer{
-		client:    client,
-		batchSize: config.BatchSize,
-		vaultPath: config.VaultPath,
-		indexFile: filepath.Join(config.VaultPath, ".obsidian_index.json"),
-		fileIndex: make(map[string]FileIndex),
+		client:       client,
+		batchSize:    config.BatchSize,
+		vaultPath:    config.VaultPath,
+		indexFile:    filepath.Join(config.VaultPath, ".obsidian_index.json"),
+		fileIndex:    make(map[string]FileIndex),
+		chunkSize:    config.ChunkSize,
+		chunkOverlap: config.ChunkOverlap,
 	}
 	
 	// Load existing index
@@ -111,21 +120,23 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 			continue
 		}
 		
-		doc, fileInfo, err := idx.processFileWithHash(file)
+		chunks, fileInfo, err := idx.processFileWithChunks(file)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("failed to process %s: %w", file, err))
 			continue
 		}
 		
-		if doc == nil {
+		if len(chunks) == 0 {
 			continue // Skip empty or invalid files
 		}
 
-		// Update file index metadata with content hash and modification time
-		doc.Metadata["last_modified"] = fileInfo.ModTime().Unix()
-		doc.Metadata["content_hash"] = fileInfo.ContentHash
+		// Update metadata for each chunk
+		for i := range chunks {
+			chunks[i].Metadata["last_modified"] = fileInfo.ModTime().Unix()
+			chunks[i].Metadata["content_hash"] = fileInfo.ContentHash
+		}
 		
-		documents = append(documents, *doc)
+		documents = append(documents, chunks...)
 		
 		// Check if this is an update or new file
 		if _, exists := idx.fileIndex[file]; exists {
@@ -134,12 +145,12 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 			result.IndexedFiles++
 		}
 		
-		// Update in-memory index
+		// Update in-memory index (use first chunk's ID for tracking)
 		idx.fileIndex[file] = FileIndex{
 			Path:         file,
 			LastModified: fileInfo.ModTime(),
 			ContentHash:  fileInfo.ContentHash,
-			DocumentID:   doc.ID,
+			DocumentID:   chunks[0].ID,
 			LastIndexed:  time.Now(),
 		}
 
@@ -389,4 +400,217 @@ func generateDocumentID(filePath string) string {
 	// Create MD5 hash of the path for consistent ID generation
 	hash := md5.Sum([]byte(cleanPath))
 	return fmt.Sprintf("%x", hash)
+}
+
+// generateChunkID creates a unique ID for a chunk based on file path and chunk index
+func generateChunkID(filePath string, chunkIndex int) string {
+	// Clean and normalize the path
+	cleanPath := filepath.Clean(filePath)
+	
+	// Create MD5 hash of the path and chunk index for consistent ID generation
+	chunkKey := fmt.Sprintf("%s_chunk_%d", cleanPath, chunkIndex)
+	hash := md5.Sum([]byte(chunkKey))
+	return fmt.Sprintf("%x", hash)
+}
+
+// processFileWithChunks processes a file and returns chunks with file info including content hash
+func (idx *ObsidianIndexer) processFileWithChunks(filePath string) ([]chroma.Document, *FileWithHash, error) {
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// Get file info
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	// Calculate content hash
+	contentHash := fmt.Sprintf("%x", sha256.Sum256(content))
+
+	// Create FileWithHash
+	fileWithHash := &FileWithHash{
+		FileInfo:    fileInfo,
+		ContentHash: contentHash,
+	}
+
+	// Skip empty files
+	if len(content) == 0 {
+		return nil, fileWithHash, nil
+	}
+
+	// Ensure content is valid UTF-8
+	contentStr := string(content)
+	if !utf8.ValidString(contentStr) {
+		// Try to clean invalid UTF-8
+		contentStr = strings.ToValidUTF8(contentStr, "")
+	}
+
+	// Skip files that are too short
+	if len(strings.TrimSpace(contentStr)) < 10 {
+		return nil, fileWithHash, nil
+	}
+
+	// Split content into chunks
+	chunks := idx.chunkContent(contentStr, filePath)
+	
+	return chunks, fileWithHash, nil
+}
+
+// chunkContent splits markdown content into semantic chunks
+func (idx *ObsidianIndexer) chunkContent(content string, filePath string) []chroma.Document {
+	var chunks []chroma.Document
+	
+	// First try to split by headers
+	headerChunks := idx.splitByHeaders(content)
+	
+	for i, chunk := range headerChunks {
+		// If chunk is still too large, split it further
+		if len(chunk) > idx.chunkSize {
+			subChunks := idx.splitBySize(chunk, idx.chunkSize, idx.chunkOverlap)
+			for j, subChunk := range subChunks {
+				chunkIndex := i*1000 + j // Ensure unique indexing
+				doc := chroma.Document{
+					ID:      generateChunkID(filePath, chunkIndex),
+					Content: subChunk,
+					Metadata: map[string]interface{}{
+						"path":        filePath,
+						"filename":    filepath.Base(filePath),
+						"folder":      filepath.Dir(filePath),
+						"chunk_index": chunkIndex,
+						"chunk_type":  "sub_header",
+					},
+				}
+				chunks = append(chunks, doc)
+			}
+		} else {
+			doc := chroma.Document{
+				ID:      generateChunkID(filePath, i),
+				Content: chunk,
+				Metadata: map[string]interface{}{
+					"path":        filePath,
+					"filename":    filepath.Base(filePath),
+					"folder":      filepath.Dir(filePath),
+					"chunk_index": i,
+					"chunk_type":  "header",
+				},
+			}
+			chunks = append(chunks, doc)
+		}
+	}
+	
+	// If no header-based chunks were created, fall back to size-based chunking
+	if len(chunks) == 0 {
+		sizeChunks := idx.splitBySize(content, idx.chunkSize, idx.chunkOverlap)
+		for i, chunk := range sizeChunks {
+			doc := chroma.Document{
+				ID:      generateChunkID(filePath, i),
+				Content: chunk,
+				Metadata: map[string]interface{}{
+					"path":        filePath,
+					"filename":    filepath.Base(filePath),
+					"folder":      filepath.Dir(filePath),
+					"chunk_index": i,
+					"chunk_type":  "size",
+				},
+			}
+			chunks = append(chunks, doc)
+		}
+	}
+	
+	return chunks
+}
+
+// splitByHeaders splits content by markdown headers
+func (idx *ObsidianIndexer) splitByHeaders(content string) []string {
+	// Split by headers (# ## ### etc.)
+	headerRegex := regexp.MustCompile(`(?m)^(#{1,6})\s+(.+)$`)
+	
+	// Find all header positions
+	matches := headerRegex.FindAllStringIndex(content, -1)
+	if len(matches) == 0 {
+		// No headers found, return entire content
+		return []string{content}
+	}
+	
+	var chunks []string
+	start := 0
+	
+	for i, match := range matches {
+		// Add content before this header (if any)
+		if match[0] > start {
+			chunk := strings.TrimSpace(content[start:match[0]])
+			if len(chunk) > 0 {
+				chunks = append(chunks, chunk)
+			}
+		}
+		
+		// Determine the end of this section
+		var end int
+		if i+1 < len(matches) {
+			end = matches[i+1][0] // Next header start
+		} else {
+			end = len(content) // End of content
+		}
+		
+		// Add this header section
+		chunk := strings.TrimSpace(content[match[0]:end])
+		if len(chunk) > 0 {
+			chunks = append(chunks, chunk)
+		}
+		
+		start = end
+	}
+	
+	return chunks
+}
+
+// splitBySize splits content into size-based chunks with overlap
+func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) []string {
+	if len(content) <= chunkSize {
+		return []string{content}
+	}
+	
+	var chunks []string
+	start := 0
+	
+	for start < len(content) {
+		end := start + chunkSize
+		if end > len(content) {
+			end = len(content)
+		}
+		
+		// Try to break at word boundary
+		if end < len(content) {
+			// Look for last space within reasonable distance
+			for i := end; i > end-100 && i > start; i-- {
+				if content[i] == ' ' || content[i] == '\n' {
+					end = i
+					break
+				}
+			}
+		}
+		
+		chunk := strings.TrimSpace(content[start:end])
+		if len(chunk) > 0 {
+			chunks = append(chunks, chunk)
+		}
+		
+		// Move start position with overlap, ensuring progress
+		nextStart := end - overlap
+		if nextStart <= start {
+			// Ensure we always make progress to avoid infinite loop
+			nextStart = start + 1
+		}
+		start = nextStart
+		
+		// Safety check: if we're at the end, break
+		if start >= len(content) {
+			break
+		}
+	}
+	
+	return chunks
 }

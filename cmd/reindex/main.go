@@ -38,12 +38,11 @@ func main() {
 
 	log.Printf("Connected to ChromaDB at %s:%d, collection: %s", *host, *port, *collection)
 
-	// Create indexer
-	indexerConfig := &indexer.Config{
-		VaultPath:   *vaultPath,
-		BatchSize:   *batchSize,
-		Directories: strings.Split(*dirs, ","),
-	}
+	// Create indexer with default config and override specific values
+	indexerConfig := indexer.DefaultConfig()
+	indexerConfig.VaultPath = *vaultPath
+	indexerConfig.BatchSize = *batchSize
+	indexerConfig.Directories = strings.Split(*dirs, ",")
 
 	obsidianIndexer := indexer.NewObsidianIndexer(client, indexerConfig)
 
