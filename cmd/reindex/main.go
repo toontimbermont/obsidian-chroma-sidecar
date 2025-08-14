@@ -56,7 +56,9 @@ func main() {
 	// Print summary
 	log.Printf("=== Reindexing Summary ===")
 	log.Printf("Processed files: %d", result.ProcessedFiles)
-	log.Printf("Indexed files: %d", result.IndexedFiles)
+	log.Printf("New files indexed: %d", result.IndexedFiles)
+	log.Printf("Updated files: %d", result.UpdatedFiles)
+	log.Printf("Skipped files: %d", result.SkippedFiles)
 	log.Printf("Batches uploaded: %d", result.BatchesUploaded)
 	log.Printf("Errors: %d", len(result.Errors))
 

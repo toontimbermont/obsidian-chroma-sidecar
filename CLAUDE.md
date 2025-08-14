@@ -42,7 +42,7 @@ Standard Go project layout with semantic search capabilities:
 
 ### Core Components
 - `cmd/obsidian-ai-agent/` - Main search application
-- `cmd/reindex/` - Vault reindexing utility  
+- `cmd/reindex/` - Vault reindexing utility
 - `cmd/clear-collection/` - Collection management utility
 - `internal/chroma/` - ChromaDB client wrapper
 - `internal/indexer/` - Obsidian markdown file indexer
