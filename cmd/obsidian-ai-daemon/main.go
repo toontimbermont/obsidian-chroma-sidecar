@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,7 +20,7 @@ import (
 func main() {
 	// Disable Go runtime exit cleanup that conflicts with ChromaDB client
 	os.Setenv("GODEBUG", "exitonpanic=0")
-	
+
 	var (
 		vaultPath  = flag.String("vault", ".", "Path to the Obsidian vault")
 		dirs       = flag.String("dirs", "Zettelkasten,Projects", "Comma-separated list of directories to index")
@@ -45,7 +44,7 @@ func main() {
 
 	// Track shutdown to prevent multiple signal handling
 	var shutdownOnce sync.Once
-	
+
 	go func() {
 		<-sigChan
 		shutdownOnce.Do(func() {
@@ -76,12 +75,11 @@ func main() {
 
 	log.Printf("Connected to ChromaDB at %s:%d, collection: %s", *host, *port, *collection)
 
-	// Create indexer
-	indexerConfig := &indexer.Config{
-		VaultPath:   *vaultPath,
-		BatchSize:   *batchSize,
-		Directories: strings.Split(*dirs, ","),
-	}
+	// Create indexer with default config and override specific values
+	indexerConfig := indexer.DefaultConfig()
+	indexerConfig.VaultPath = *vaultPath
+	indexerConfig.BatchSize = *batchSize
+	indexerConfig.Directories = strings.Split(*dirs, ",")
 
 	obsidianIndexer := indexer.NewObsidianIndexer(client, indexerConfig)
 
@@ -101,11 +99,7 @@ func main() {
 		select {
 		case <-ctx.Done():
 			log.Println("Stopping daemon...")
-			
-			// Set client to nil to avoid cleanup issues
-			client = nil
-			obsidianIndexer = nil
-			
+
 			// Stop ChromaDB
 			log.Println("Stopping ChromaDB container...")
 			if err := stopChromaDB(); err != nil {
@@ -113,10 +107,9 @@ func main() {
 			} else {
 				log.Println("ChromaDB stopped successfully")
 			}
-			
+
 			log.Println("Daemon stopped")
-			// Use runtime.Goexit to cleanly exit main goroutine
-			runtime.Goexit()
+			os.Exit(0)
 
 		case <-ticker.C:
 			log.Printf("Starting scheduled reindex at %s", time.Now().Format("15:04:05"))
@@ -135,14 +128,14 @@ func ensureChromaDBRunning() error {
 	}
 
 	log.Println("Starting ChromaDB container...")
-	
-	cmd := exec.Command("docker", "run", "-d", "--rm", "--name", "chromadb", 
-		"-p", "8037:8000", 
-		"-v", "./.chroma:/chroma/chroma", 
-		"-e", "IS_PERSISTENT=TRUE", 
-		"-e", "ANONYMIZED_TELEMETRY=FALSE", 
+
+	cmd := exec.Command("docker", "run", "-d", "--rm", "--name", "chromadb",
+		"-p", "8037:8000",
+		"-v", "./.chroma:/chroma/chroma",
+		"-e", "IS_PERSISTENT=TRUE",
+		"-e", "ANONYMIZED_TELEMETRY=FALSE",
 		"chromadb/chroma")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to start ChromaDB container: %w\nOutput: %s", err, output)
@@ -158,7 +151,7 @@ func isChromaDBRunning() bool {
 	if err != nil {
 		return false
 	}
-	
+
 	return strings.Contains(string(output), "chromadb")
 }
 
@@ -179,16 +172,16 @@ func stopChromaDB() error {
 
 func performIndexing(ctx context.Context, indexer *indexer.ObsidianIndexer, directories []string) error {
 	start := time.Now()
-	
+
 	result, err := indexer.ReindexVault(ctx, directories)
 	if err != nil {
 		return fmt.Errorf("reindexing failed: %w", err)
 	}
 
 	duration := time.Since(start)
-	
+
 	log.Printf("=== Indexing Complete (took %s) ===", duration.Round(time.Millisecond))
-	log.Printf("Processed: %d, New: %d, Updated: %d, Skipped: %d, Errors: %d", 
+	log.Printf("Processed: %d, New: %d, Updated: %d, Skipped: %d, Errors: %d",
 		result.ProcessedFiles, result.IndexedFiles, result.UpdatedFiles, result.SkippedFiles, len(result.Errors))
 
 	if len(result.Errors) > 0 {

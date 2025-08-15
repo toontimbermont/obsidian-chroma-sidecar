@@ -18,6 +18,11 @@ import (
 	"obsidian-ai-agent/internal/chroma"
 )
 
+// ChromaClient defines the interface for ChromaDB operations used by the indexer
+type ChromaClient interface {
+	UpsertDocuments(ctx context.Context, documents []chroma.Document) error
+}
+
 // FileIndex represents metadata about an indexed file
 type FileIndex struct {
 	Path         string    `json:"path"`
@@ -29,7 +34,7 @@ type FileIndex struct {
 
 // ObsidianIndexer handles indexing of Obsidian markdown files
 type ObsidianIndexer struct {
-	client       *chroma.Client
+	client       ChromaClient
 	batchSize    int
 	vaultPath    string
 	indexFile    string
@@ -59,7 +64,7 @@ func DefaultConfig() *Config {
 }
 
 // NewObsidianIndexer creates a new Obsidian indexer
-func NewObsidianIndexer(client *chroma.Client, config *Config) *ObsidianIndexer {
+func NewObsidianIndexer(client ChromaClient, config *Config) *ObsidianIndexer {
 	indexer := &ObsidianIndexer{
 		client:       client,
 		batchSize:    config.BatchSize,
