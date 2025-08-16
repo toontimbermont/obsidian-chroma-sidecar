@@ -2,20 +2,27 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"obsidian-ai-agent/internal/chroma"
+	"obsidian-ai-agent/internal/httpserver"
 	"obsidian-ai-agent/internal/indexer"
 )
+
+//go:embed chroma-config.yaml
+var chromaConfigYAML []byte
 
 func main() {
 	// Disable Go runtime exit cleanup that conflicts with ChromaDB client
@@ -29,6 +36,8 @@ func main() {
 		port       = flag.Int("port", 8037, "ChromaDB port")
 		collection = flag.String("collection", "notes", "ChromaDB collection name")
 		batchSize  = flag.Int("batch", 50, "Batch size for document uploads")
+		httpPort   = flag.Int("http-port", 8087, "HTTP API server port (0 to disable)")
+		enableHTTP = flag.Bool("enable-http", true, "Enable HTTP API server")
 	)
 	flag.Parse()
 
@@ -36,6 +45,11 @@ func main() {
 	log.Printf("Vault: %s", *vaultPath)
 	log.Printf("Directories: %s", *dirs)
 	log.Printf("Reindex interval: %s", *interval)
+	if *enableHTTP && *httpPort > 0 {
+		log.Printf("HTTP API enabled on port: %d", *httpPort)
+	} else {
+		log.Printf("HTTP API disabled")
+	}
 
 	// Set up signal handling for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -89,16 +103,41 @@ func main() {
 		log.Printf("Initial indexing failed: %v", err)
 	}
 
+	// Start HTTP server if enabled
+	var httpSrv *httpserver.Server
+	if *enableHTTP && *httpPort > 0 {
+		httpSrv = httpserver.NewServer(client, *httpPort)
+		go func() {
+			if err := httpSrv.Start(); err != nil && err != http.ErrServerClosed {
+				log.Printf("HTTP server failed: %v", err)
+			}
+		}()
+	}
+
 	// Start periodic indexing
 	ticker := time.NewTicker(*interval)
 	defer ticker.Stop()
 
 	log.Printf("Starting periodic reindexing every %s (press Ctrl-C to stop)", *interval)
+	if httpSrv != nil {
+		log.Printf("HTTP API available at http://localhost:%d", *httpPort)
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("Stopping daemon...")
+
+			// Stop HTTP server
+			if httpSrv != nil {
+				shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer shutdownCancel()
+				if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+					log.Printf("Warning: Failed to stop HTTP server: %v", err)
+				} else {
+					log.Println("HTTP server stopped successfully")
+				}
+			}
 
 			// Stop ChromaDB
 			log.Println("Stopping ChromaDB container...")
@@ -129,10 +168,17 @@ func ensureChromaDBRunning() error {
 
 	log.Println("Starting ChromaDB container...")
 
+	// Create temporary config file from embedded content
+	configPath, err := createTempConfigFile()
+	if err != nil {
+		return fmt.Errorf("failed to create temporary config file: %w", err)
+	}
+	defer os.Remove(configPath) // Clean up temp file when done
+
 	cmd := exec.Command("docker", "run", "-d", "--rm", "--name", "chromadb",
 		"-p", "8037:8000",
-		"-v", "./.chroma:/chroma/chroma",
-		"-v", "./chroma-config.yaml:/config.yaml",
+		"-v", "./.chroma:/chroma",
+		"-v", fmt.Sprintf("%s:/config.yaml", configPath),
 		"chromadb/chroma")
 
 	output, err := cmd.CombinedOutput()
@@ -167,6 +213,29 @@ func stopChromaDB() error {
 	}
 
 	return nil
+}
+
+func createTempConfigFile() (string, error) {
+	// Create a temporary file for the ChromaDB config
+	tempFile, err := os.CreateTemp("", "chroma-config-*.yaml")
+	if err != nil {
+		return "", err
+	}
+
+	// Write the embedded config content to the temp file
+	if _, err := tempFile.Write(chromaConfigYAML); err != nil {
+		tempFile.Close()
+		os.Remove(tempFile.Name())
+		return "", err
+	}
+
+	if err := tempFile.Close(); err != nil {
+		os.Remove(tempFile.Name())
+		return "", err
+	}
+
+	// Return the absolute path to ensure Docker can find it
+	return filepath.Abs(tempFile.Name())
 }
 
 func performIndexing(ctx context.Context, indexer *indexer.ObsidianIndexer, directories []string) error {

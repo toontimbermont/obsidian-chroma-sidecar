@@ -2,11 +2,12 @@ module obsidian-ai-agent
 
 go 1.24.5
 
-require github.com/magefile/mage v1.15.0
+require (
+	github.com/amikos-tech/chroma-go v0.2.3
+	github.com/magefile/mage v1.15.0
+)
 
 require (
-	github.com/Masterminds/semver v1.5.0 // indirect
-	github.com/amikos-tech/chroma-go v0.2.3 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect

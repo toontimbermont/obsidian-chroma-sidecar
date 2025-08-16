@@ -26,10 +26,16 @@ func BuildDaemon() error {
 	return sh.Run("go", "build", "-o", "bin/obsidian-ai-daemon", "./cmd/obsidian-ai-daemon")
 }
 
+// BuildSimilarityServer builds the similarity server binary
+func BuildSimilarityServer() error {
+	fmt.Println("Building similarity server...")
+	return sh.Run("go", "build", "-o", "bin/obsidian-ai-similarity-server", "./cmd/similarity-server")
+}
+
 // BuildAll builds all binaries
 func BuildAll() error {
 	fmt.Println("Building all binaries...")
-	mg.Deps(Build, BuildDaemon)
+	mg.Deps(Build, BuildDaemon, BuildSimilarityServer)
 	return nil
 }
 
@@ -83,10 +89,17 @@ func InstallDaemon() error {
 	return sh.RunV("go", "install", "./cmd/obsidian-ai-daemon")
 }
 
+// InstallSimilarityServer installs the similarity server binary to GOPATH/bin
+func InstallSimilarityServer() error {
+	mg.Deps(BuildSimilarityServer)
+	fmt.Println("Installing similarity server...")
+	return sh.RunV("go", "install", "./cmd/similarity-server")
+}
+
 // InstallAll installs all binaries to GOPATH/bin
 func InstallAll() error {
 	fmt.Println("Installing all binaries...")
-	mg.Deps(Install, InstallDaemon)
+	mg.Deps(Install, InstallDaemon, InstallSimilarityServer)
 	return nil
 }
 
@@ -110,7 +123,7 @@ func (Chroma) Start() error {
 	os.MkdirAll(".chroma", 0755)
 	return sh.RunV("docker", "run", "-d", "--rm", "--name", "chromadb",
 		"-p", "8037:8000",
-		"-v", "./.chroma:/chroma/chroma",
+		"-v", "./.chroma:/chroma",
 		"-v", "./chroma-config.yaml:/config.yaml",
 		"chromadb/chroma")
 }
@@ -175,6 +188,22 @@ func (Chroma) DaemonCustom(vault, dirs, interval string) error {
 
 	fmt.Printf("Starting daemon for vault: %s, dirs: %s, interval: %s\n", vault, dirs, interval)
 	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-vault", vault, "-dirs", dirs, "-interval", interval)
+}
+
+// DaemonWithHTTP runs the daemon with HTTP API on a custom port
+func (Chroma) DaemonWithHTTP(httpPort string) error {
+	if httpPort == "" {
+		httpPort = "8080"
+	}
+
+	fmt.Printf("Starting daemon with HTTP API on port: %s\n", httpPort)
+	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-http-port", httpPort, "-enable-http")
+}
+
+// DaemonNoHTTP runs the daemon without HTTP API
+func (Chroma) DaemonNoHTTP() error {
+	fmt.Println("Starting daemon without HTTP API...")
+	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-enable-http=false")
 }
 
 func init() {

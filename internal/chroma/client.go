@@ -203,6 +203,21 @@ func (c *Client) GetDocumentCount(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// GetCollections returns the list of all collections
+func (c *Client) GetCollections(ctx context.Context) ([]string, error) {
+	collections, err := c.client.ListCollections(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list collections: %w", err)
+	}
+
+	names := make([]string, len(collections))
+	for i, collection := range collections {
+		names[i] = collection.Name()
+	}
+
+	return names, nil
+}
+
 // convertToDocumentIDs converts string IDs to DocumentID type
 func convertToDocumentIDs(ids []string) []v2.DocumentID {
 	docIDs := make([]v2.DocumentID, len(ids))
