@@ -132,8 +132,7 @@ func ensureChromaDBRunning() error {
 	cmd := exec.Command("docker", "run", "-d", "--rm", "--name", "chromadb",
 		"-p", "8037:8000",
 		"-v", "./.chroma:/chroma/chroma",
-		"-e", "IS_PERSISTENT=TRUE",
-		"-e", "ANONYMIZED_TELEMETRY=FALSE",
+		"-v", "./chroma-config.yaml:/config.yaml",
 		"chromadb/chroma")
 
 	output, err := cmd.CombinedOutput()

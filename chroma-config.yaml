@@ -1,0 +1,2 @@
+# ChromaDB Configuration File
+cors_allow_origins: ["app://obsidian.md", "http://localhost:*"]

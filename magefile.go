@@ -78,6 +78,7 @@ func Install() error {
 
 // InstallDaemon installs the daemon binary to GOPATH/bin
 func InstallDaemon() error {
+	mg.Deps(BuildDaemon)
 	fmt.Println("Installing daemon...")
 	return sh.RunV("go", "install", "./cmd/obsidian-ai-daemon")
 }
@@ -106,8 +107,12 @@ type Chroma mg.Namespace
 func (Chroma) Start() error {
 	fmt.Println("Starting ChromaDB Docker container...")
 	// Ensure chroma directory exists for persistent storage
-	os.MkdirAll("chroma", 0755)
-	return sh.RunV("docker", "run", "-d", "--rm", "--name", "chromadb", "-p", "8037:8000", "-v", "./.chroma:/chroma/chroma", "-e", "IS_PERSISTENT=TRUE", "-e", "ANONYMIZED_TELEMETRY=FALSE", "chromadb/chroma")
+	os.MkdirAll(".chroma", 0755)
+	return sh.RunV("docker", "run", "-d", "--rm", "--name", "chromadb",
+		"-p", "8037:8000",
+		"-v", "./.chroma:/chroma/chroma",
+		"-v", "./chroma-config.yaml:/config.yaml",
+		"chromadb/chroma")
 }
 
 // Stop stops the ChromaDB Docker container
@@ -130,7 +135,7 @@ func (Chroma) ReindexCustom(vault, dirs string) error {
 	if dirs == "" {
 		dirs = "Zettelkasten,Projects"
 	}
-	
+
 	fmt.Printf("Reindexing Obsidian vault at %s, folders: %s\n", vault, dirs)
 	return sh.RunV("go", "run", "./cmd/reindex", "-vault", vault, "-dirs", dirs)
 }
@@ -167,7 +172,7 @@ func (Chroma) DaemonCustom(vault, dirs, interval string) error {
 	if interval == "" {
 		interval = "5m"
 	}
-	
+
 	fmt.Printf("Starting daemon for vault: %s, dirs: %s, interval: %s\n", vault, dirs, interval)
 	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-vault", vault, "-dirs", dirs, "-interval", interval)
 }
@@ -175,6 +180,6 @@ func (Chroma) DaemonCustom(vault, dirs, interval string) error {
 func init() {
 	// Ensure bin directory exists for builds
 	os.MkdirAll("bin", 0755)
-	// Ensure chroma directory exists for persistent storage
-	os.MkdirAll("chroma", 0755)
+	// Ensure .chroma directory exists for persistent storage
+	os.MkdirAll(".chroma", 0755)
 }
