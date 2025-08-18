@@ -37,6 +37,7 @@ type ObsidianIndexer struct {
 	client       ChromaClient
 	batchSize    int
 	vaultPath    string
+	directories  []string
 	indexFile    string
 	fileIndex    map[string]FileIndex
 	chunkSize    int
@@ -69,6 +70,7 @@ func NewObsidianIndexer(client ChromaClient, config *Config) *ObsidianIndexer {
 		client:       client,
 		batchSize:    config.BatchSize,
 		vaultPath:    config.VaultPath,
+		directories:  config.Directories,
 		indexFile:    filepath.Join(config.VaultPath, ".obsidian_index.json"),
 		fileIndex:    make(map[string]FileIndex),
 		chunkSize:    config.ChunkSize,
@@ -458,11 +460,23 @@ func (idx *ObsidianIndexer) processFileWithChunks(filePath string) ([]chroma.Doc
 		return nil, fileWithHash, nil
 	}
 
-	// Clean content before chunking
-	cleanedContent := idx.cleanContent(contentStr)
+	// Extract frontmatter and enhance content before processing
+	enhancedContent, frontmatterMetadata := idx.enhanceContentWithFrontmatter(contentStr, filePath)
+	
+	// Clean enhanced content before chunking
+	cleanedContent := idx.cleanContent(enhancedContent)
 
 	// Split content into chunks
 	chunks := idx.chunkContent(cleanedContent, filePath)
+	
+	// Add frontmatter metadata to each chunk
+	for i := range chunks {
+		// Merge frontmatter metadata with existing chunk metadata
+		for key, value := range frontmatterMetadata {
+			// Convert arrays to strings for ChromaDB compatibility
+			chunks[i].Metadata[key] = idx.convertMetadataValue(value)
+		}
+	}
 
 	return chunks, fileWithHash, nil
 }
@@ -656,6 +670,248 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 	}
 
 	return chunks
+}
+
+// extractFrontmatter parses Obsidian-style frontmatter and returns structured data plus body content
+func (idx *ObsidianIndexer) extractFrontmatter(content string) (map[string]interface{}, string) {
+	frontmatter := make(map[string]interface{})
+	
+	// Check if content starts with frontmatter (no YAML --- markers in Obsidian style)
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 {
+		return frontmatter, content
+	}
+	
+	separatorIndex := -1
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "---" {
+			separatorIndex = i
+			break
+		}
+	}
+	
+	// If no separator found, treat entire content as body
+	if separatorIndex == -1 {
+		return frontmatter, content
+	}
+	
+	// Parse frontmatter lines
+	for i := 0; i < separatorIndex; i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+		
+		// Parse created date (first line if it's just numbers)
+		if i == 0 && regexp.MustCompile(`^\d+$`).MatchString(line) {
+			frontmatter["created_date"] = line
+			continue
+		}
+		
+		// Parse key-value pairs
+		if strings.Contains(line, ":") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(strings.ToLower(parts[0]))
+				value := strings.TrimSpace(parts[1])
+				
+				switch key {
+				case "categories":
+					if categories := idx.parseCategories(value); len(categories) > 0 {
+						frontmatter["categories"] = categories
+					}
+				case "tags":
+					if tags := idx.parseTags(value); len(tags) > 0 {
+						frontmatter["tags"] = tags
+					}
+				}
+			}
+		}
+	}
+	
+	// Extract body content (everything after separator)
+	bodyLines := lines[separatorIndex+1:]
+	body := strings.Join(bodyLines, "\n")
+	body = strings.TrimSpace(body)
+	
+	return frontmatter, body
+}
+
+// parseCategories extracts categories from Obsidian-style [[Category]] format
+func (idx *ObsidianIndexer) parseCategories(value string) []string {
+	var categories []string
+	
+	// Match [[Category Name]] patterns
+	categoryRegex := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
+	matches := categoryRegex.FindAllStringSubmatch(value, -1)
+	
+	for _, match := range matches {
+		if len(match) > 1 {
+			category := strings.TrimSpace(match[1])
+			if category != "" {
+				categories = append(categories, category)
+			}
+		}
+	}
+	
+	return categories
+}
+
+// parseTags extracts tags from comma-separated format
+func (idx *ObsidianIndexer) parseTags(value string) []string {
+	var tags []string
+	
+	if strings.TrimSpace(value) == "" {
+		return tags
+	}
+	
+	// Split by comma and clean up
+	parts := strings.Split(value, ",")
+	for _, part := range parts {
+		tag := strings.TrimSpace(part)
+		if tag != "" {
+			tags = append(tags, tag)
+		}
+	}
+	
+	return tags
+}
+
+// frontmatterToContent converts frontmatter metadata to readable content
+func (idx *ObsidianIndexer) frontmatterToContent(frontmatter map[string]interface{}) string {
+	var parts []string
+	
+	// Add categories if present
+	if categories, ok := frontmatter["categories"].([]string); ok && len(categories) > 0 {
+		if len(categories) == 1 {
+			parts = append(parts, fmt.Sprintf("This document covers %s topics.", categories[0]))
+		} else if len(categories) == 2 {
+			parts = append(parts, fmt.Sprintf("This document covers %s and %s topics.", categories[0], categories[1]))
+		} else {
+			// For 3+ categories: "A, B, and C"
+			categoryList := strings.Join(categories[:len(categories)-1], ", ")
+			parts = append(parts, fmt.Sprintf("This document covers %s, and %s topics.", categoryList, categories[len(categories)-1]))
+		}
+	}
+	
+	// Add tags if present
+	if tags, ok := frontmatter["tags"].([]string); ok && len(tags) > 0 {
+		tagList := strings.Join(tags, ", ")
+		parts = append(parts, fmt.Sprintf("Tags: %s.", tagList))
+	}
+	
+	return strings.Join(parts, " ")
+}
+
+// extractFolderCategories extracts ALL folder levels as categories from file path using vault configuration
+func (idx *ObsidianIndexer) extractFolderCategories(filePath string) []string {
+	categories := make([]string, 0) // Initialize as empty slice, not nil
+	
+	// Clean the path and make it absolute if it's relative
+	cleanPath := filepath.Clean(filePath)
+	if !filepath.IsAbs(cleanPath) {
+		cleanPath = filepath.Join(idx.vaultPath, cleanPath)
+	}
+	
+	// Convert vault path to absolute for comparison
+	vaultPath := filepath.Clean(idx.vaultPath)
+	if !filepath.IsAbs(vaultPath) {
+		// Convert relative vault path to absolute
+		if absVaultPath, err := filepath.Abs(vaultPath); err == nil {
+			vaultPath = absVaultPath
+		}
+	}
+	
+	// Check if file is within vault
+	relPath, err := filepath.Rel(vaultPath, cleanPath)
+	if err != nil || strings.HasPrefix(relPath, "..") {
+		// File is outside vault
+		return categories
+	}
+	
+	// Split the relative path into parts
+	parts := strings.Split(relPath, string(filepath.Separator))
+	
+	// Remove empty parts and filename
+	var cleanParts []string
+	for i, part := range parts {
+		if part != "" && part != "." && i < len(parts)-1 { // Exclude filename (last part)
+			cleanParts = append(cleanParts, part)
+		}
+	}
+	
+	// If no folders, return empty
+	if len(cleanParts) == 0 {
+		return categories
+	}
+	
+	// Check if first folder is one of our configured directories
+	firstFolder := cleanParts[0]
+	isConfiguredDir := false
+	for _, dir := range idx.directories {
+		if strings.EqualFold(firstFolder, dir) {
+			isConfiguredDir = true
+			break
+		}
+	}
+	
+	// If file is in a configured directory, extract ALL folder levels after it
+	if isConfiguredDir && len(cleanParts) > 1 {
+		// Add all folders between configured directory and file as categories
+		categories = append(categories, cleanParts[1:]...)
+	}
+	
+	return categories
+}
+
+// enhanceContentWithFrontmatter combines frontmatter extraction, folder categories, and content enhancement
+func (idx *ObsidianIndexer) enhanceContentWithFrontmatter(content string, filePath string) (string, map[string]interface{}) {
+	// Extract frontmatter from content
+	frontmatter, bodyContent := idx.extractFrontmatter(content)
+	
+	// Extract folder-based categories
+	folderCategories := idx.extractFolderCategories(filePath)
+	
+	// Merge folder categories with frontmatter categories
+	var allCategories []string
+	if fmCategories, ok := frontmatter["categories"].([]string); ok {
+		allCategories = append(allCategories, fmCategories...)
+	}
+	allCategories = append(allCategories, folderCategories...)
+	
+	// Update frontmatter with combined categories
+	if len(allCategories) > 0 {
+		frontmatter["categories"] = allCategories
+	}
+	
+	// Convert frontmatter to readable content
+	frontmatterContent := idx.frontmatterToContent(frontmatter)
+	
+	// Combine frontmatter content with body content
+	var enhancedContent string
+	if frontmatterContent != "" && bodyContent != "" {
+		enhancedContent = frontmatterContent + "\n\n" + bodyContent
+	} else if frontmatterContent != "" {
+		enhancedContent = frontmatterContent
+	} else {
+		enhancedContent = bodyContent
+	}
+	
+	return enhancedContent, frontmatter
+}
+
+// convertMetadataValue converts array values to strings for ChromaDB compatibility
+func (idx *ObsidianIndexer) convertMetadataValue(value interface{}) interface{} {
+	// Convert []string to comma-separated string for ChromaDB compatibility
+	if strSlice, ok := value.([]string); ok {
+		if len(strSlice) == 0 {
+			return ""
+		}
+		return strings.Join(strSlice, ", ")
+	}
+	
+	// Return other types as-is (strings, numbers, booleans are supported by ChromaDB)
+	return value
 }
 
 // cleanContent removes URLs and other problematic content that can cause tokenization issues
