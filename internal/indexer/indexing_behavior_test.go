@@ -80,8 +80,8 @@ Content in the second section.`
 		VaultPath:    tempDir,
 		BatchSize:    10,
 		Directories:  []string{"."},
-		ChunkSize:    200,
-		ChunkOverlap: 50,
+		ChunkSize:    50,  // Reduced from 200 to force chunking
+		ChunkOverlap: 10,  // Reduced proportionally
 	}
 	
 	indexer := NewObsidianIndexer(mockClient, config)
@@ -161,8 +161,8 @@ Original content.`
 		VaultPath:    tempDir,
 		BatchSize:    10,
 		Directories:  []string{"."},
-		ChunkSize:    200,
-		ChunkOverlap: 50,
+		ChunkSize:    50,  // Reduced from 200 to force chunking
+		ChunkOverlap: 10,  // Reduced proportionally
 	}
 	
 	indexer := NewObsidianIndexer(mockClient, config)
