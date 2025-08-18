@@ -583,6 +583,9 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 
 	var chunks []string
 	start := 0
+	
+	// Minimum meaningful chunk size to prevent tiny chunks at boundaries
+	minChunkSize := 50 // Minimum 50 characters for meaningful content
 
 	for start < len(content) {
 		end := start + chunkSize
@@ -606,12 +609,44 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 			chunks = append(chunks, chunk)
 		}
 
-		// Move start position with overlap, ensuring progress
+		// Calculate next start position with overlap
 		nextStart := end - overlap
+		
+		// Prevent cascading tiny chunks at document boundaries
 		if nextStart <= start {
-			// Ensure we always make progress to avoid infinite loop
+			// If overlap would cause us to go backwards or stay in place,
+			// check if the remaining content is small enough to append to current chunk
+			remainingContent := len(content) - end
+			if remainingContent <= minChunkSize && len(chunks) > 0 {
+				// Append remaining small content to the last chunk
+				remainingText := strings.TrimSpace(content[end:])
+				if len(remainingText) > 0 {
+					lastChunk := chunks[len(chunks)-1]
+					chunks[len(chunks)-1] = lastChunk + " " + remainingText
+				}
+				break
+			}
+			// Otherwise ensure we make minimal progress (but still prevent infinite loop)
 			nextStart = start + 1
 		}
+		
+		// Additional check: if remaining content would create cascading tiny chunks, stop
+		remainingFromNext := len(content) - nextStart
+		if remainingFromNext <= minChunkSize {
+			// Append remaining content to the last chunk instead of creating tiny chunks
+			if len(chunks) > 0 && remainingFromNext > 0 {
+				lastChunk := chunks[len(chunks)-1]
+				remainingText := strings.TrimSpace(content[nextStart:])
+				if len(remainingText) > 0 {
+					// Only append if it's not already included (avoid duplication)
+					if !strings.HasSuffix(lastChunk, remainingText) {
+						chunks[len(chunks)-1] = lastChunk + " " + remainingText
+					}
+				}
+			}
+			break
+		}
+		
 		start = nextStart
 
 		// Safety check: if we're at the end, break
