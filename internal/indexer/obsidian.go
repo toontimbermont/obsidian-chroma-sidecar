@@ -458,8 +458,11 @@ func (idx *ObsidianIndexer) processFileWithChunks(filePath string) ([]chroma.Doc
 		return nil, fileWithHash, nil
 	}
 
+	// Clean content before chunking
+	cleanedContent := idx.cleanContent(contentStr)
+	
 	// Split content into chunks
-	chunks := idx.chunkContent(contentStr, filePath)
+	chunks := idx.chunkContent(cleanedContent, filePath)
 	
 	return chunks, fileWithHash, nil
 }
@@ -618,4 +621,30 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 	}
 	
 	return chunks
+}
+
+// cleanContent removes URLs and other problematic content that can cause tokenization issues
+func (idx *ObsidianIndexer) cleanContent(content string) string {
+	// Remove YAML frontmatter
+	frontmatterRegex := regexp.MustCompile(`(?s)^---.*?---\s*`)
+	content = frontmatterRegex.ReplaceAllString(content, "")
+	
+	// Remove markdown links but keep link text: [text](url) -> text
+	// This must be done BEFORE removing standalone URLs
+	markdownLinkRegex := regexp.MustCompile(`\[([^\]]+)\]\([^)]*\)`)
+	content = markdownLinkRegex.ReplaceAllString(content, "$1")
+	
+	// Remove Obsidian wikilinks but keep link text: [[text]] -> text
+	wikiLinkRegex := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
+	content = wikiLinkRegex.ReplaceAllString(content, "$1")
+	
+	// Remove standalone URLs (http/https) - after processing markdown links
+	urlRegex := regexp.MustCompile(`https?://[^\s\)]+`)
+	content = urlRegex.ReplaceAllString(content, "")
+	
+	// Remove excessive whitespace and normalize
+	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
+	content = strings.TrimSpace(content)
+	
+	return content
 }
