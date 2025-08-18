@@ -11,7 +11,7 @@ import (
 func main() {
 	var (
 		host       = flag.String("host", "localhost", "ChromaDB host")
-		port       = flag.Int("port", 8037, "ChromaDB port") 
+		port       = flag.Int("port", 8037, "ChromaDB port")
 		collection = flag.String("collection", "notes", "ChromaDB collection name to clear")
 	)
 	flag.Parse()

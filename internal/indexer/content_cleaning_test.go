@@ -39,8 +39,8 @@ func TestCleanContent(t *testing.T) {
 			expected: "See Strategy for more info",
 		},
 		{
-			name:     "Complex real-world example from Strategy Books",
-			input:    `11. [**Good Strategy Bad Strategy** by Richard Rumelt](https://revopsteam.com/revops-strategy/business-strategy-books/#good-strategy-bad-strategy)
+			name: "Complex real-world example from Strategy Books",
+			input: `11. [**Good Strategy Bad Strategy** by Richard Rumelt](https://revopsteam.com/revops-strategy/business-strategy-books/#good-strategy-bad-strategy)
 12. [**Blue Ocean Strategy** by W. Chan Kim and Renée Mauborgne](https://revopsteam.com/revops-strategy/business-strategy-books/#blue-ocean-strategy)`,
 			expected: "11. **Good Strategy Bad Strategy** by Richard Rumelt 12. **Blue Ocean Strategy** by W. Chan Kim and Renée Mauborgne",
 		},
@@ -60,8 +60,8 @@ func TestCleanContent(t *testing.T) {
 			expected: "Too much whitespace here",
 		},
 		{
-			name:     "Mixed content with frontmatter, URLs, and links",
-			input:    `---
+			name: "Mixed content with frontmatter, URLs, and links",
+			input: `---
 title: Test Page
 ---
 
@@ -190,8 +190,7 @@ See also [[Strategy]] for related topics.`
 
 // Helper function to check if text contains URLs
 func containsURL(text string) bool {
-	return len(text) > 7 && (
-		contains(text, "http://") ||
+	return len(text) > 7 && (contains(text, "http://") ||
 		contains(text, "https://"))
 }
 

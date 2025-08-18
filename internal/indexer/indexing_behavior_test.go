@@ -13,9 +13,9 @@ import (
 
 // MockChromaClient implements the ChromaClient interface for testing
 type MockChromaClient struct {
-	UpsertCalls   [][]chroma.Document
-	UpsertErrors  []error
-	callIndex     int
+	UpsertCalls  [][]chroma.Document
+	UpsertErrors []error
+	callIndex    int
 }
 
 func NewMockChromaClient() *MockChromaClient {
@@ -27,7 +27,7 @@ func NewMockChromaClient() *MockChromaClient {
 
 func (m *MockChromaClient) UpsertDocuments(ctx context.Context, documents []chroma.Document) error {
 	m.UpsertCalls = append(m.UpsertCalls, documents)
-	
+
 	if m.callIndex < len(m.UpsertErrors) {
 		err := m.UpsertErrors[m.callIndex]
 		m.callIndex++
@@ -56,7 +56,7 @@ func TestNewFileIndexing(t *testing.T) {
 	// Create temporary directory and file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "new_note.md")
-	
+
 	testContent := `# New Note
 
 This is a new note that hasn't been indexed before.
@@ -80,10 +80,10 @@ Content in the second section.`
 		VaultPath:    tempDir,
 		BatchSize:    10,
 		Directories:  []string{"."},
-		ChunkSize:    50,  // Reduced from 200 to force chunking
-		ChunkOverlap: 10,  // Reduced proportionally
+		ChunkSize:    50, // Reduced from 200 to force chunking
+		ChunkOverlap: 10, // Reduced proportionally
 	}
-	
+
 	indexer := NewObsidianIndexer(mockClient, config)
 
 	// Perform indexing
@@ -145,7 +145,7 @@ func TestChangedFileReindexing(t *testing.T) {
 	// Create temporary directory and file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "existing_note.md")
-	
+
 	originalContent := `# Existing Note
 
 Original content.`
@@ -161,10 +161,10 @@ Original content.`
 		VaultPath:    tempDir,
 		BatchSize:    10,
 		Directories:  []string{"."},
-		ChunkSize:    50,  // Reduced from 200 to force chunking
-		ChunkOverlap: 10,  // Reduced proportionally
+		ChunkSize:    50, // Reduced from 200 to force chunking
+		ChunkOverlap: 10, // Reduced proportionally
 	}
-	
+
 	indexer := NewObsidianIndexer(mockClient, config)
 	ctx := context.Background()
 
@@ -227,12 +227,12 @@ Even more new content to ensure the file is detected as changed.`
 	finalDocCount := mockClient.GetTotalUpsertedDocuments()
 
 	if finalUpsertCount <= initialUpsertCount {
-		t.Errorf("Expected more upsert calls after file change: initial %d, final %d", 
+		t.Errorf("Expected more upsert calls after file change: initial %d, final %d",
 			initialUpsertCount, finalUpsertCount)
 	}
 
 	if finalDocCount <= initialDocCount {
-		t.Errorf("Expected more documents after file change: initial %d, final %d", 
+		t.Errorf("Expected more documents after file change: initial %d, final %d",
 			initialDocCount, finalDocCount)
 	}
 
@@ -250,7 +250,7 @@ func TestUnchangedFileSkipping(t *testing.T) {
 	// Create temporary directory and file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "unchanged_note.md")
-	
+
 	content := `# Unchanged Note
 
 This content will not change between indexing runs.
@@ -273,7 +273,7 @@ Some static content.`
 		ChunkSize:    200,
 		ChunkOverlap: 50,
 	}
-	
+
 	indexer := NewObsidianIndexer(mockClient, config)
 	ctx := context.Background()
 
@@ -315,12 +315,12 @@ Some static content.`
 	finalDocCount := mockClient.GetTotalUpsertedDocuments()
 
 	if finalUpsertCount != initialUpsertCount {
-		t.Errorf("Expected no additional upsert calls for unchanged file: initial %d, final %d", 
+		t.Errorf("Expected no additional upsert calls for unchanged file: initial %d, final %d",
 			initialUpsertCount, finalUpsertCount)
 	}
 
 	if finalDocCount != initialDocCount {
-		t.Errorf("Expected no additional documents for unchanged file: initial %d, final %d", 
+		t.Errorf("Expected no additional documents for unchanged file: initial %d, final %d",
 			initialDocCount, finalDocCount)
 	}
 }
@@ -329,7 +329,7 @@ Some static content.`
 func TestBatchProcessing(t *testing.T) {
 	// Create temporary directory with multiple files
 	tempDir := t.TempDir()
-	
+
 	// Create 5 files to test batching with batch size of 2
 	for i := 0; i < 5; i++ {
 		fileName := filepath.Join(tempDir, fmt.Sprintf("note_%d.md", i))
@@ -349,7 +349,7 @@ func TestBatchProcessing(t *testing.T) {
 		ChunkSize:    200,
 		ChunkOverlap: 50,
 	}
-	
+
 	indexer := NewObsidianIndexer(mockClient, config)
 	ctx := context.Background()
 
@@ -383,7 +383,7 @@ func TestBatchProcessing(t *testing.T) {
 	for i, docs := range mockClient.UpsertCalls {
 		// Since each file produces 1 chunk, batch size should be respected
 		if len(docs) > config.BatchSize {
-			t.Errorf("Batch %d exceeded batch size: got %d docs, limit %d", 
+			t.Errorf("Batch %d exceeded batch size: got %d docs, limit %d",
 				i, len(docs), config.BatchSize)
 		}
 	}
@@ -394,7 +394,7 @@ func TestErrorHandling(t *testing.T) {
 	// Create temporary directory and file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "error_test.md")
-	
+
 	content := `# Error Test
 
 This file will cause a ChromaDB error during indexing.`
@@ -415,7 +415,7 @@ This file will cause a ChromaDB error during indexing.`
 		ChunkSize:    200,
 		ChunkOverlap: 50,
 	}
-	
+
 	indexer := NewObsidianIndexer(mockClient, config)
 	ctx := context.Background()
 

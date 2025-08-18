@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"obsidian-ai-agent/internal/chroma"
 	v2 "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"obsidian-ai-agent/internal/chroma"
 )
 
 type Server struct {
@@ -64,7 +64,7 @@ func main() {
 	}
 
 	server.setupRoutes()
-	
+
 	log.Printf("Starting similarity server on port %d", *port)
 	log.Printf("Connected to ChromaDB at %s:%d, collection: %s", *chromaHost, *chromaPort, *collection)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
@@ -169,20 +169,20 @@ func (s *Server) extractQueryText(content string) string {
 	// Remove YAML frontmatter
 	frontmatterRegex := regexp.MustCompile(`(?s)^---.*?---\s*`)
 	content = frontmatterRegex.ReplaceAllString(content, "")
-	
+
 	// Remove markdown formatting
 	content = s.cleanMarkdown(content)
-	
+
 	// Remove extra whitespace and normalize
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
 	content = strings.TrimSpace(content)
-	
+
 	// If content is too long, take first meaningful chunk
 	if len(content) > 2000 {
 		// Try to break at sentence boundary
 		sentences := regexp.MustCompile(`[.!?]+\s+`).Split(content, -1)
 		var result strings.Builder
-		
+
 		for _, sentence := range sentences {
 			if result.Len()+len(sentence) > 1500 {
 				break
@@ -194,7 +194,7 @@ func (s *Server) extractQueryText(content string) string {
 		}
 		content = result.String()
 	}
-	
+
 	return content
 }
 
@@ -202,28 +202,28 @@ func (s *Server) extractQueryText(content string) string {
 func (s *Server) cleanMarkdown(content string) string {
 	// Remove headers
 	content = regexp.MustCompile(`(?m)^#{1,6}\s+`).ReplaceAllString(content, "")
-	
+
 	// Remove code blocks
 	content = regexp.MustCompile("(?s)```.*?```").ReplaceAllString(content, "")
 	content = regexp.MustCompile("`[^`]+`").ReplaceAllString(content, "")
-	
+
 	// Remove links but keep link text
 	content = regexp.MustCompile(`\[([^\]]+)\]\([^)]+\)`).ReplaceAllString(content, "$1")
 	content = regexp.MustCompile(`\[\[([^\]]+)\]\]`).ReplaceAllString(content, "$1")
-	
+
 	// Remove bold/italic formatting
 	content = regexp.MustCompile(`\*\*([^*]+)\*\*`).ReplaceAllString(content, "$1")
 	content = regexp.MustCompile(`\*([^*]+)\*`).ReplaceAllString(content, "$1")
 	content = regexp.MustCompile(`__([^_]+)__`).ReplaceAllString(content, "$1")
 	content = regexp.MustCompile(`_([^_]+)_`).ReplaceAllString(content, "$1")
-	
+
 	// Remove bullet points and list markers
 	content = regexp.MustCompile(`(?m)^[\s]*[-*+]\s+`).ReplaceAllString(content, "")
 	content = regexp.MustCompile(`(?m)^[\s]*\d+\.\s+`).ReplaceAllString(content, "")
-	
+
 	// Remove block quotes
 	content = regexp.MustCompile(`(?m)^>\s*`).ReplaceAllString(content, "")
-	
+
 	return content
 }
 

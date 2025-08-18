@@ -59,13 +59,13 @@ func main() {
 	documents := docGroups[0]
 	metadataGroups := result.GetMetadatasGroups()
 	distanceGroups := result.GetDistancesGroups()
-	
+
 	fmt.Printf("\nFound %d results:\n\n", len(documents))
-	
+
 	for i, doc := range documents {
 		var metadata map[string]interface{}
 		var distance float64
-		
+
 		if len(metadataGroups) > 0 && i < len(metadataGroups[0]) {
 			// Convert DocumentMetadata to map
 			docMeta := metadataGroups[0][i]
@@ -83,7 +83,7 @@ func main() {
 		if len(distanceGroups) > 0 && i < len(distanceGroups[0]) {
 			distance = float64(distanceGroups[0][i])
 		}
-		
+
 		fmt.Printf("=== Result %d (Distance: %.4f) ===\n", i+1, distance)
 		if path, ok := metadata["path"].(string); ok {
 			fmt.Printf("File: %s\n", path)

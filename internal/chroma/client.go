@@ -78,7 +78,7 @@ func (c *Client) AddDocuments(ctx context.Context, documents []Document) error {
 		return fmt.Errorf("failed to convert metadatas: %w", err)
 	}
 
-	err = c.collection.Add(ctx, 
+	err = c.collection.Add(ctx,
 		v2.WithTexts(contents...),
 		v2.WithIDs(convertToDocumentIDs(ids)...),
 		v2.WithMetadatas(docMetadatas...),
@@ -111,7 +111,7 @@ func (c *Client) UpsertDocuments(ctx context.Context, documents []Document) erro
 		return fmt.Errorf("failed to convert metadatas: %w", err)
 	}
 
-	err = c.collection.Upsert(ctx, 
+	err = c.collection.Upsert(ctx,
 		v2.WithTexts(contents...),
 		v2.WithIDs(convertToDocumentIDs(ids)...),
 		v2.WithMetadatas(docMetadatas...),
@@ -135,7 +135,7 @@ func (c *Client) DocumentExists(ctx context.Context, id string) (bool, error) {
 
 // GetDocumentMetadata retrieves metadata for a specific document
 func (c *Client) GetDocumentMetadata(ctx context.Context, id string) (map[string]interface{}, error) {
-	result, err := c.collection.Get(ctx, 
+	result, err := c.collection.Get(ctx,
 		v2.WithIDsGet(v2.DocumentID(id)),
 	)
 	if err != nil {

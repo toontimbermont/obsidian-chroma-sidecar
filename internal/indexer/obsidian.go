@@ -45,20 +45,20 @@ type ObsidianIndexer struct {
 
 // Config holds configuration for the Obsidian indexer
 type Config struct {
-	VaultPath string
-	BatchSize int
-	Directories []string
-	ChunkSize int // Target chunk size in characters (default: 2000)
+	VaultPath    string
+	BatchSize    int
+	Directories  []string
+	ChunkSize    int // Target chunk size in characters (default: 2000)
 	ChunkOverlap int // Overlap between chunks in characters (default: 200)
 }
 
 // DefaultConfig returns default indexer configuration
 func DefaultConfig() *Config {
 	return &Config{
-		VaultPath: ".",
-		BatchSize: 50,
-		Directories: []string{"notes", "projects"},
-		ChunkSize: 2000,
+		VaultPath:    ".",
+		BatchSize:    50,
+		Directories:  []string{"notes", "projects"},
+		ChunkSize:    2000,
 		ChunkOverlap: 200,
 	}
 }
@@ -74,10 +74,10 @@ func NewObsidianIndexer(client ChromaClient, config *Config) *ObsidianIndexer {
 		chunkSize:    config.ChunkSize,
 		chunkOverlap: config.ChunkOverlap,
 	}
-	
+
 	// Load existing index
 	indexer.loadFileIndex()
-	
+
 	return indexer
 }
 
@@ -109,28 +109,28 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 
 	// Process files in batches
 	documents := make([]chroma.Document, 0, idx.batchSize)
-	
+
 	for _, file := range files {
 		result.ProcessedFiles++
-		
+
 		// Check if file needs indexing
 		needsIndexing, err := idx.fileNeedsIndexing(file)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("failed to check if file needs indexing %s: %w", file, err))
 			continue
 		}
-		
+
 		if !needsIndexing {
 			result.SkippedFiles++
 			continue
 		}
-		
+
 		chunks, fileInfo, err := idx.processFileWithChunks(file)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Errorf("failed to process %s: %w", file, err))
 			continue
 		}
-		
+
 		if len(chunks) == 0 {
 			continue // Skip empty or invalid files
 		}
@@ -140,16 +140,16 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 			chunks[i].Metadata["last_modified"] = fileInfo.ModTime().Unix()
 			chunks[i].Metadata["content_hash"] = fileInfo.ContentHash
 		}
-		
+
 		documents = append(documents, chunks...)
-		
+
 		// Check if this is an update or new file
 		if _, exists := idx.fileIndex[file]; exists {
 			result.UpdatedFiles++
 		} else {
 			result.IndexedFiles++
 		}
-		
+
 		// Update in-memory index (use first chunk's ID for tracking)
 		idx.fileIndex[file] = FileIndex{
 			Path:         file,
@@ -186,7 +186,7 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 		result.Errors = append(result.Errors, fmt.Errorf("failed to save file index: %w", err))
 	}
 
-	log.Printf("Indexing complete. Processed: %d, New: %d, Updated: %d, Skipped: %d, Batches: %d, Errors: %d", 
+	log.Printf("Indexing complete. Processed: %d, New: %d, Updated: %d, Skipped: %d, Batches: %d, Errors: %d",
 		result.ProcessedFiles, result.IndexedFiles, result.UpdatedFiles, result.SkippedFiles, result.BatchesUploaded, len(result.Errors))
 
 	return result, nil
@@ -198,7 +198,7 @@ func (idx *ObsidianIndexer) findMarkdownFiles(directories []string) ([]string, e
 
 	for _, dir := range directories {
 		dirPath := filepath.Join(idx.vaultPath, dir)
-		
+
 		// Check if directory exists
 		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
 			log.Printf("Directory %s does not exist, skipping", dirPath)
@@ -401,7 +401,7 @@ func (idx *ObsidianIndexer) processFileWithHash(filePath string) (*chroma.Docume
 func generateDocumentID(filePath string) string {
 	// Clean and normalize the path
 	cleanPath := filepath.Clean(filePath)
-	
+
 	// Create MD5 hash of the path for consistent ID generation
 	hash := md5.Sum([]byte(cleanPath))
 	return fmt.Sprintf("%x", hash)
@@ -411,7 +411,7 @@ func generateDocumentID(filePath string) string {
 func generateChunkID(filePath string, chunkIndex int) string {
 	// Clean and normalize the path
 	cleanPath := filepath.Clean(filePath)
-	
+
 	// Create MD5 hash of the path and chunk index for consistent ID generation
 	chunkKey := fmt.Sprintf("%s_chunk_%d", cleanPath, chunkIndex)
 	hash := md5.Sum([]byte(chunkKey))
@@ -460,20 +460,20 @@ func (idx *ObsidianIndexer) processFileWithChunks(filePath string) ([]chroma.Doc
 
 	// Clean content before chunking
 	cleanedContent := idx.cleanContent(contentStr)
-	
+
 	// Split content into chunks
 	chunks := idx.chunkContent(cleanedContent, filePath)
-	
+
 	return chunks, fileWithHash, nil
 }
 
 // chunkContent splits markdown content into semantic chunks
 func (idx *ObsidianIndexer) chunkContent(content string, filePath string) []chroma.Document {
 	var chunks []chroma.Document
-	
+
 	// First try to split by headers
 	headerChunks := idx.splitByHeaders(content)
-	
+
 	for i, chunk := range headerChunks {
 		// If chunk is still too large, split it further
 		if len(chunk) > idx.chunkSize {
@@ -508,7 +508,7 @@ func (idx *ObsidianIndexer) chunkContent(content string, filePath string) []chro
 			chunks = append(chunks, doc)
 		}
 	}
-	
+
 	// If no header-based chunks were created, fall back to size-based chunking
 	if len(chunks) == 0 {
 		sizeChunks := idx.splitBySize(content, idx.chunkSize, idx.chunkOverlap)
@@ -527,7 +527,7 @@ func (idx *ObsidianIndexer) chunkContent(content string, filePath string) []chro
 			chunks = append(chunks, doc)
 		}
 	}
-	
+
 	return chunks
 }
 
@@ -535,17 +535,17 @@ func (idx *ObsidianIndexer) chunkContent(content string, filePath string) []chro
 func (idx *ObsidianIndexer) splitByHeaders(content string) []string {
 	// Split by headers (# ## ### etc.)
 	headerRegex := regexp.MustCompile(`(?m)^(#{1,6})\s+(.+)$`)
-	
+
 	// Find all header positions
 	matches := headerRegex.FindAllStringIndex(content, -1)
 	if len(matches) == 0 {
 		// No headers found, return entire content
 		return []string{content}
 	}
-	
+
 	var chunks []string
 	start := 0
-	
+
 	for i, match := range matches {
 		// Add content before this header (if any)
 		if match[0] > start {
@@ -554,7 +554,7 @@ func (idx *ObsidianIndexer) splitByHeaders(content string) []string {
 				chunks = append(chunks, chunk)
 			}
 		}
-		
+
 		// Determine the end of this section
 		var end int
 		if i+1 < len(matches) {
@@ -562,16 +562,16 @@ func (idx *ObsidianIndexer) splitByHeaders(content string) []string {
 		} else {
 			end = len(content) // End of content
 		}
-		
+
 		// Add this header section
 		chunk := strings.TrimSpace(content[match[0]:end])
 		if len(chunk) > 0 {
 			chunks = append(chunks, chunk)
 		}
-		
+
 		start = end
 	}
-	
+
 	return chunks
 }
 
@@ -580,16 +580,16 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 	if len(content) <= chunkSize {
 		return []string{content}
 	}
-	
+
 	var chunks []string
 	start := 0
-	
+
 	for start < len(content) {
 		end := start + chunkSize
 		if end > len(content) {
 			end = len(content)
 		}
-		
+
 		// Try to break at word boundary
 		if end < len(content) {
 			// Look for last space within reasonable distance
@@ -600,12 +600,12 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 				}
 			}
 		}
-		
+
 		chunk := strings.TrimSpace(content[start:end])
 		if len(chunk) > 0 {
 			chunks = append(chunks, chunk)
 		}
-		
+
 		// Move start position with overlap, ensuring progress
 		nextStart := end - overlap
 		if nextStart <= start {
@@ -613,13 +613,13 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 			nextStart = start + 1
 		}
 		start = nextStart
-		
+
 		// Safety check: if we're at the end, break
 		if start >= len(content) {
 			break
 		}
 	}
-	
+
 	return chunks
 }
 
@@ -628,23 +628,23 @@ func (idx *ObsidianIndexer) cleanContent(content string) string {
 	// Remove YAML frontmatter
 	frontmatterRegex := regexp.MustCompile(`(?s)^---.*?---\s*`)
 	content = frontmatterRegex.ReplaceAllString(content, "")
-	
+
 	// Remove markdown links but keep link text: [text](url) -> text
 	// This must be done BEFORE removing standalone URLs
 	markdownLinkRegex := regexp.MustCompile(`\[([^\]]+)\]\([^)]*\)`)
 	content = markdownLinkRegex.ReplaceAllString(content, "$1")
-	
+
 	// Remove Obsidian wikilinks but keep link text: [[text]] -> text
 	wikiLinkRegex := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 	content = wikiLinkRegex.ReplaceAllString(content, "$1")
-	
+
 	// Remove standalone URLs (http/https) - after processing markdown links
 	urlRegex := regexp.MustCompile(`https?://[^\s\)]+`)
 	content = urlRegex.ReplaceAllString(content, "")
-	
+
 	// Remove excessive whitespace and normalize
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
 	content = strings.TrimSpace(content)
-	
+
 	return content
 }

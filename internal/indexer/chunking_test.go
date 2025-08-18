@@ -91,7 +91,7 @@ More content`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.splitByHeaders(tt.content)
-			
+
 			if len(result) != len(tt.expected) {
 				t.Errorf("splitByHeaders() got %d chunks, want %d", len(result), len(tt.expected))
 				for i, chunk := range result {
@@ -112,7 +112,7 @@ More content`,
 // TestSplitBySize tests the size-based splitting with overlap
 func TestSplitBySize(t *testing.T) {
 	indexer := &ObsidianIndexer{
-		chunkSize:    50,  // Small size for testing
+		chunkSize:    50, // Small size for testing
 		chunkOverlap: 10,
 	}
 
@@ -153,16 +153,16 @@ func TestSplitBySize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.splitBySize(tt.content, tt.chunkSize, tt.overlap)
-			
+
 			if len(result) < tt.minChunks || len(result) > tt.maxChunks {
-				t.Errorf("splitBySize() got %d chunks, want between %d and %d", 
+				t.Errorf("splitBySize() got %d chunks, want between %d and %d",
 					len(result), tt.minChunks, tt.maxChunks)
 			}
 
 			// Verify each chunk is within size limits
 			for i, chunk := range result {
 				if len(chunk) > tt.chunkSize+50 { // Allow some tolerance for word boundaries
-					t.Errorf("splitBySize() chunk %d length %d exceeds chunk size %d", 
+					t.Errorf("splitBySize() chunk %d length %d exceeds chunk size %d",
 						i, len(chunk), tt.chunkSize)
 				}
 			}
@@ -170,7 +170,7 @@ func TestSplitBySize(t *testing.T) {
 			// Verify all content is preserved
 			combined := strings.Join(result, "")
 			if len(combined) < len(tt.content) {
-				t.Errorf("splitBySize() lost content: original %d chars, combined %d chars", 
+				t.Errorf("splitBySize() lost content: original %d chars, combined %d chars",
 					len(tt.content), len(combined))
 			}
 		})
@@ -209,8 +209,8 @@ More content.`,
 			expectTypes:  []string{"header", "header", "header"},
 		},
 		{
-			name: "size-based fallback",
-			content: `This is a very long document without any headers that should be split into multiple chunks based on size alone. It contains quite a bit of text to ensure that the size-based chunking algorithm kicks in and creates multiple documents. We want to test that this works correctly and preserves all the content while staying within the specified chunk size limits.`,
+			name:         "size-based fallback",
+			content:      `This is a very long document without any headers that should be split into multiple chunks based on size alone. It contains quite a bit of text to ensure that the size-based chunking algorithm kicks in and creates multiple documents. We want to test that this works correctly and preserves all the content while staying within the specified chunk size limits.`,
 			filePath:     "/test/file.md",
 			expectChunks: 3, // Should be split by size
 			expectTypes:  []string{"size", "size", "size"},
@@ -234,7 +234,7 @@ Short section.`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.chunkContent(tt.content, tt.filePath)
-			
+
 			if len(result) < 1 {
 				t.Errorf("chunkContent() returned no chunks")
 				return
@@ -249,7 +249,7 @@ Short section.`,
 					t.Errorf("chunkContent() chunk %d missing content", i)
 				}
 				if chunk.Metadata["path"] != tt.filePath {
-					t.Errorf("chunkContent() chunk %d wrong path: got %v, want %s", 
+					t.Errorf("chunkContent() chunk %d wrong path: got %v, want %s",
 						i, chunk.Metadata["path"], tt.filePath)
 				}
 				if chunk.Metadata["chunk_index"] == nil {
@@ -300,23 +300,23 @@ func TestGenerateChunkID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			id1 := generateChunkID(tt.filePath, tt.chunkIndex)
 			id2 := generateChunkID(tt.filePath, tt.chunkIndex)
-			
+
 			// Should be consistent
 			if id1 != id2 {
 				t.Errorf("generateChunkID() inconsistent: %s != %s", id1, id2)
 			}
-			
+
 			// Should be non-empty
 			if id1 == "" {
 				t.Errorf("generateChunkID() returned empty ID")
 			}
-			
+
 			// Different indices should produce different IDs
 			id3 := generateChunkID(tt.filePath, tt.chunkIndex+1)
 			if id1 == id3 {
 				t.Errorf("generateChunkID() same ID for different indices")
 			}
-			
+
 			// Different paths should produce different IDs
 			id4 := generateChunkID(tt.filePath+"_different", tt.chunkIndex)
 			if id1 == id4 {
@@ -331,7 +331,7 @@ func TestProcessFileWithChunks(t *testing.T) {
 	// Create a temporary test file
 	tempDir := t.TempDir()
 	testFile := filepath.Join(tempDir, "test.md")
-	
+
 	testContent := `# Test Document
 
 This is a test document for verifying the chunking functionality.
@@ -396,7 +396,7 @@ Content in section 2 with more text to ensure proper chunking behavior.`
 // TestChunkSizeLimits tests that chunks stay within reasonable size limits
 func TestChunkSizeLimits(t *testing.T) {
 	indexer := &ObsidianIndexer{
-		chunkSize:    500,  // Reasonable size for testing
+		chunkSize:    500, // Reasonable size for testing
 		chunkOverlap: 50,
 	}
 
@@ -418,7 +418,7 @@ func TestChunkSizeLimits(t *testing.T) {
 	// Verify no chunk is excessively large (allowing some tolerance)
 	for i, chunk := range chunks {
 		if len(chunk.Content) > indexer.chunkSize*2 {
-			t.Errorf("Chunk %d too large: %d characters (limit: %d)", 
+			t.Errorf("Chunk %d too large: %d characters (limit: %d)",
 				i, len(chunk.Content), indexer.chunkSize)
 		}
 	}
