@@ -22,6 +22,7 @@ type Server struct {
 
 type SimilarityRequest struct {
 	Content string `json:"content"`
+	Limit   int    `json:"limit,omitempty"`
 }
 
 type SimilarityResult struct {
@@ -34,6 +35,7 @@ type SimilarityResult struct {
 type SimilarityResponse struct {
 	Results []SimilarityResult `json:"results"`
 	Query   string             `json:"query"`
+	Limit   int                `json:"limit"`
 }
 
 // NewServer creates a new HTTP server for similarity queries
@@ -135,6 +137,12 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set default limit if not provided or invalid
+	limit := req.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -146,7 +154,7 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Query ChromaDB for similar documents
-	results, err := s.chromaClient.Query(ctx, queryText, 10)
+	results, err := s.chromaClient.Query(ctx, queryText, int32(limit))
 	if err != nil {
 		log.Printf("ChromaDB query failed: %v", err)
 		http.Error(w, "Query failed", http.StatusInternalServerError)
@@ -154,7 +162,7 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Format response
-	response := s.formatResults(results, queryText)
+	response := s.formatResults(results, queryText, limit)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
@@ -229,10 +237,11 @@ func (s *Server) cleanMarkdown(content string) string {
 }
 
 // formatResults converts ChromaDB results to our response format
-func (s *Server) formatResults(result v2.QueryResult, queryText string) SimilarityResponse {
+func (s *Server) formatResults(result v2.QueryResult, queryText string, limit int) SimilarityResponse {
 	response := SimilarityResponse{
 		Results: make([]SimilarityResult, 0),
 		Query:   queryText,
+		Limit:   limit,
 	}
 
 	// Extract data from ChromaDB query result
