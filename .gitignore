@@ -38,3 +38,4 @@ Thumbs.db
 .claude
 .chroma
 .serena/cache/go/*.pkl
+test_vault/.obsidian_index.json

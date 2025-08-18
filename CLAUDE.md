@@ -43,9 +43,14 @@ This project uses [Mage](https://magefile.org/) for build automation. All comman
 - `mage build` - Build the test utility to `bin/obsidian-ai-chroma-test-util`
 - `mage buildDaemon` - Build the daemon binary to `bin/obsidian-ai-daemon`
 - `mage buildAll` - Build all binaries
-- `mage test` - Run the full test suite
 - `mage dev` - Run the test utility in development mode
 - `mage check` - Run all pre-commit checks (format, lint, test)
+
+### Test Commands
+- `mage test:all` - Run the full test suite
+- `mage test:short` - Run tests in short mode (skips integration tests)
+- `mage test:unit` - Run unit tests only (alias for short)
+- `mage test:integration` - Run integration tests (requires Docker)
 
 ### ChromaDB Commands
 - `mage chroma:start` - Start ChromaDB Docker container (port 8037)

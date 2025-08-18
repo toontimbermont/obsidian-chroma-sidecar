@@ -46,10 +46,31 @@ func Clean() error {
 }
 
 // Test runs the test suite
-func Test() error {
+type Test mg.Namespace
+
+// All runs the full test suite
+func (Test) All() error {
 	fmt.Println("Running tests...")
 	return sh.RunV("go", "test", "./...")
 }
+
+// Short runs tests in short mode, skipping integration tests
+func (Test) Short() error {
+	fmt.Println("Running tests in short mode (skipping integration tests)...")
+	return sh.RunV("go", "test", "-short", "./...")
+}
+
+// Integration runs integration tests that require Docker
+func (Test) Integration() error {
+	fmt.Println("Running integration tests...")
+	return sh.RunV("go", "test", "-tags", "integration", "./internal/indexer", "-v", "-timeout", "5m")
+}
+
+// Unit runs only unit tests (alias for Short)
+func (Test) Unit() error {
+	return Test{}.Short()
+}
+
 
 // Lint runs golangci-lint
 func Lint() error {
@@ -106,7 +127,7 @@ func InstallAll() error {
 // Check runs all pre-commit checks
 func Check() error {
 	fmt.Println("Running all checks...")
-	mg.Deps(Format, Lint, Test)
+	mg.Deps(Format, Lint, Test{}.All)
 	return nil
 }
 
