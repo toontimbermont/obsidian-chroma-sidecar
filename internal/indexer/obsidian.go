@@ -111,6 +111,7 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 
 	// Process files in batches
 	documents := make([]chroma.Document, 0, idx.batchSize)
+	batchFiles := make([]string, 0, idx.batchSize) // Track files in current batch
 
 	for _, file := range files {
 		result.ProcessedFiles++
@@ -129,11 +130,12 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 
 		chunks, fileInfo, err := idx.processFileWithChunks(file)
 		if err != nil {
-			result.Errors = append(result.Errors, fmt.Errorf("failed to process %s: %w", file, err))
+			result.Errors = append(result.Errors, fmt.Errorf("failed to process file %s: %w", file, err))
 			continue
 		}
 
 		if len(chunks) == 0 {
+			log.Printf("Skipping file %s: no content chunks generated", file)
 			continue // Skip empty or invalid files
 		}
 
@@ -144,6 +146,7 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 		}
 
 		documents = append(documents, chunks...)
+		batchFiles = append(batchFiles, file) // Track which file contributed to this batch
 
 		// Check if this is an update or new file
 		if _, exists := idx.fileIndex[file]; exists {
@@ -164,22 +167,23 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 		// Upload batch when full
 		if len(documents) >= idx.batchSize {
 			if err := idx.client.UpsertDocuments(ctx, documents); err != nil {
-				result.Errors = append(result.Errors, fmt.Errorf("failed to upsert batch: %w", err))
+				result.Errors = append(result.Errors, fmt.Errorf("failed to upsert batch containing files %v: %w", batchFiles, err))
 			} else {
 				result.BatchesUploaded++
-				log.Printf("Upserted batch of %d documents", len(documents))
+				log.Printf("Upserted batch of %d documents from %d files: %v", len(documents), len(batchFiles), batchFiles)
 			}
 			documents = documents[:0] // Reset slice
+			batchFiles = batchFiles[:0] // Reset file tracking
 		}
 	}
 
 	// Upload remaining documents
 	if len(documents) > 0 {
 		if err := idx.client.UpsertDocuments(ctx, documents); err != nil {
-			result.Errors = append(result.Errors, fmt.Errorf("failed to upsert final batch: %w", err))
+			result.Errors = append(result.Errors, fmt.Errorf("failed to upsert final batch containing files %v: %w", batchFiles, err))
 		} else {
 			result.BatchesUploaded++
-			log.Printf("Upserted final batch of %d documents", len(documents))
+			log.Printf("Upserted final batch of %d documents from %d files: %v", len(documents), len(batchFiles), batchFiles)
 		}
 	}
 
@@ -190,6 +194,14 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 
 	log.Printf("Indexing complete. Processed: %d, New: %d, Updated: %d, Skipped: %d, Batches: %d, Errors: %d",
 		result.ProcessedFiles, result.IndexedFiles, result.UpdatedFiles, result.SkippedFiles, result.BatchesUploaded, len(result.Errors))
+	
+	// Log detailed error information if there were any failures
+	if len(result.Errors) > 0 {
+		log.Printf("Indexing errors encountered:")
+		for i, err := range result.Errors {
+			log.Printf("  Error %d: %v", i+1, err)
+		}
+	}
 
 	return result, nil
 }
