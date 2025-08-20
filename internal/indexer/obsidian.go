@@ -444,7 +444,44 @@ func generateChunkID(filePath string, chunkIndex int) string {
 // This ensures consistent tokenization across different languages and prevents
 // tensor shape mismatches in ChromaDB embedding
 func normalizeUnicode(text string) string {
-	// Use Go's standard unicode normalization to remove diacritics (accents)
+	// First, handle typographic punctuation characters that cause tokenization issues
+	// These are not combining marks, so NFD normalization won't handle them
+	typographicReplacements := map[string]string{
+		// Smart quotes
+		"\u201C": "\"", // Left double quotation mark (U+201C)
+		"\u201D": "\"", // Right double quotation mark (U+201D)
+		"\u2018": "'",  // Left single quotation mark (U+2018)
+		"\u2019": "'",  // Right single quotation mark (U+2019)
+		
+		// Dashes
+		"\u2013": "-",  // En dash (U+2013)
+		"\u2014": "-",  // Em dash (U+2014)
+		
+		// Other common typographic characters
+		"\u2026": "...", // Horizontal ellipsis (U+2026)
+		"\u2022": "*",   // Bullet (U+2022)
+		"\u00A9": "(c)", // Copyright sign (U+00A9)
+		"\u00AE": "(r)", // Registered sign (U+00AE)
+		"\u2122": "(tm)", // Trademark sign (U+2122)
+		
+		// Non-breaking spaces and similar
+		"\u00A0": " ",   // Non-breaking space (U+00A0)
+		"\u2000": " ",   // En quad (U+2000)
+		"\u2001": " ",   // Em quad (U+2001)
+		"\u2002": " ",   // En space (U+2002)
+		"\u2003": " ",   // Em space (U+2003)
+		"\u2004": " ",   // Three-per-em space (U+2004)
+		"\u2005": " ",   // Four-per-em space (U+2005)
+		"\u2006": " ",   // Six-per-em space (U+2006)
+		"\u200B": "",    // Zero width space (U+200B)
+	}
+	
+	// Apply typographic character replacements
+	for unicode, ascii := range typographicReplacements {
+		text = strings.ReplaceAll(text, unicode, ascii)
+	}
+	
+	// Then apply Unicode normalization to remove diacritics (accents)
 	// This transforms accented characters like 'é', 'è', 'ë' to their base form 'e'
 	// 
 	// The process:
