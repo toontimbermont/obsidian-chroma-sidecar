@@ -118,9 +118,9 @@ func TestFrontmatterToContent(t *testing.T) {
 	indexer := &ObsidianIndexer{}
 
 	tests := []struct {
-		name           string
-		frontmatter    map[string]interface{}
-		expectedText   string
+		name         string
+		frontmatter  map[string]interface{}
+		expectedText string
 	}{
 		{
 			name: "complete frontmatter",
@@ -146,8 +146,8 @@ func TestFrontmatterToContent(t *testing.T) {
 			expectedText: "Tags: agile, scrum.",
 		},
 		{
-			name: "empty frontmatter",
-			frontmatter: map[string]interface{}{},
+			name:         "empty frontmatter",
+			frontmatter:  map[string]interface{}{},
 			expectedText: "",
 		},
 		{
@@ -179,48 +179,48 @@ func TestExtractFolderCategories(t *testing.T) {
 	indexer := NewObsidianIndexer(NewMockChromaClient(), config)
 
 	tests := []struct {
-		name           string
-		filePath       string
+		name               string
+		filePath           string
 		expectedCategories []string
 	}{
 		{
-			name:           "projects with single subfolder",
-			filePath:       "/home/user/vault/Projects/Athumi/Gesprek.md",
+			name:               "projects with single subfolder",
+			filePath:           "/home/user/vault/Projects/Athumi/Gesprek.md",
 			expectedCategories: []string{"Athumi"},
 		},
 		{
-			name:           "zettelkasten with single subfolder",
-			filePath:       "/home/user/vault/Zettelkasten/Strategy/Books.md",
+			name:               "zettelkasten with single subfolder",
+			filePath:           "/home/user/vault/Zettelkasten/Strategy/Books.md",
 			expectedCategories: []string{"Strategy"},
 		},
 		{
-			name:           "deep nested path - all folders should be categories",
-			filePath:       "/home/user/vault/Projects/ClientA/SubProject/Planning/document.md",
+			name:               "deep nested path - all folders should be categories",
+			filePath:           "/home/user/vault/Projects/ClientA/SubProject/Planning/document.md",
 			expectedCategories: []string{"ClientA", "SubProject", "Planning"},
 		},
 		{
-			name:           "very deep nesting",
-			filePath:       "/home/user/vault/Notes/Research/AI/MachineLearning/DeepLearning/CNNs/document.md",
+			name:               "very deep nesting",
+			filePath:           "/home/user/vault/Notes/Research/AI/MachineLearning/DeepLearning/CNNs/document.md",
 			expectedCategories: []string{"Research", "AI", "MachineLearning", "DeepLearning", "CNNs"},
 		},
 		{
-			name:           "no subfolder - file directly in configured directory",
-			filePath:       "/home/user/vault/Projects/document.md",
+			name:               "no subfolder - file directly in configured directory",
+			filePath:           "/home/user/vault/Projects/document.md",
 			expectedCategories: []string{},
 		},
 		{
-			name:           "file outside configured directories",
-			filePath:       "/home/user/vault/Other/subfolder/file.md",
+			name:               "file outside configured directories",
+			filePath:           "/home/user/vault/Other/subfolder/file.md",
 			expectedCategories: []string{},
 		},
 		{
-			name:           "relative path from within vault",
-			filePath:       "Projects/ClientA/SubProject/file.md",
+			name:               "relative path from within vault",
+			filePath:           "Projects/ClientA/SubProject/file.md",
 			expectedCategories: []string{"ClientA", "SubProject"},
 		},
 		{
-			name:           "top level file",
-			filePath:       "/home/user/vault/README.md",
+			name:               "top level file",
+			filePath:           "/home/user/vault/README.md",
 			expectedCategories: []string{},
 		},
 	}
@@ -262,7 +262,7 @@ Tags: development, testing
 # Main Content
 
 This is about sustainable software development.`,
-			filePath: "/home/user/vault/Projects/GreenTech/SubCategory/sustainability.md",
+			filePath:        "/home/user/vault/Projects/GreenTech/SubCategory/sustainability.md",
 			expectedContent: "This document covers Sustainable IT, Software, GreenTech, and SubCategory topics. Tags: development, testing.\n\n# Main Content\n\nThis is about sustainable software development.",
 			expectedMetadata: map[string]interface{}{
 				"created_date": "202508181928",
@@ -275,7 +275,7 @@ This is about sustainable software development.`,
 			originalContent: `# Simple Document
 
 Just some content here.`,
-			filePath: "Zettelkasten/Research/notes.md",
+			filePath:        "Zettelkasten/Research/notes.md",
 			expectedContent: "This document covers Research topics.\n\n# Simple Document\n\nJust some content here.",
 			expectedMetadata: map[string]interface{}{
 				"categories": []string{"Research"},
@@ -289,7 +289,7 @@ Categories: [[AI]]
 ---
 
 # AI Research`,
-			filePath: "notes.md",
+			filePath:        "notes.md",
 			expectedContent: "This document covers AI topics.\n\n# AI Research",
 			expectedMetadata: map[string]interface{}{
 				"created_date": "202508181928",

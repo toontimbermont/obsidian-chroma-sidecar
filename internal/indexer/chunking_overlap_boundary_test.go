@@ -15,20 +15,20 @@ func TestChunkingOverlapBoundaryIssue(t *testing.T) {
 	// This reproduces the exact scenario from Strategy Books.md
 	// Content that's larger than chunk size but ends with a short line that gets fragmented
 	content := buildTestContent()
-	
+
 	t.Logf("Content length: %d characters", len(content))
 	t.Logf("Expected reasonable chunk count: ~%d", (len(content)/indexer.chunkSize)+1)
 
 	// Test the splitBySize function directly
 	chunks := indexer.splitBySize(content, indexer.chunkSize, indexer.chunkOverlap)
-	
+
 	t.Logf("Actual chunk count: %d", len(chunks))
 
 	// Analyze the chunks
 	meaningfulChunks := 0
 	tinyChunks := 0
 	minMeaningfulSize := 100 // Chunks smaller than this are considered "tiny"
-	
+
 	for i, chunk := range chunks {
 		if len(chunk) >= minMeaningfulSize {
 			meaningfulChunks++
@@ -45,7 +45,7 @@ func TestChunkingOverlapBoundaryIssue(t *testing.T) {
 	t.Logf("Tiny chunks (<%d chars): %d", minMeaningfulSize, tinyChunks)
 
 	// ASSERTIONS: This test should FAIL before the fix
-	
+
 	// We expect a reasonable number of meaningful chunks (around 4-6 for this content size)
 	expectedMaxMeaningfulChunks := 10
 	if meaningfulChunks > expectedMaxMeaningfulChunks {
@@ -80,7 +80,7 @@ func TestChunkingOverlapBoundaryIssue(t *testing.T) {
 	for _, chunk := range chunks {
 		combinedLength += len(chunk)
 	}
-	
+
 	// Due to overlap, combined length will be larger than original, but should be reasonable
 	maxExpectedCombined := len(content) + (len(chunks) * indexer.chunkOverlap)
 	if combinedLength > maxExpectedCombined {
@@ -91,8 +91,8 @@ func TestChunkingOverlapBoundaryIssue(t *testing.T) {
 // TestSpecificOverlapBoundaryCase tests the exact boundary condition that causes the issue
 func TestSpecificOverlapBoundaryCase(t *testing.T) {
 	indexer := &ObsidianIndexer{
-		chunkSize:    100,  // Small size for easier testing
-		chunkOverlap: 20,   // 20% overlap
+		chunkSize:    100, // Small size for easier testing
+		chunkOverlap: 20,  // 20% overlap
 	}
 
 	// Create content that will trigger the boundary issue
@@ -100,19 +100,19 @@ func TestSpecificOverlapBoundaryCase(t *testing.T) {
 	mainContent := "This is the main content that should be split into reasonable chunks. " +
 		"It contains enough text to span multiple chunks when processed. " +
 		"We want to ensure that the overlap algorithm works correctly. "
-	
+
 	// This short ending line is what causes the cascade of tiny chunks
 	shortEnding := "Short ending line."
-	
+
 	content := mainContent + shortEnding
-	
+
 	t.Logf("Content: %q", content)
 	t.Logf("Content length: %d", len(content))
 	t.Logf("Main content length: %d", len(mainContent))
 	t.Logf("Short ending length: %d", len(shortEnding))
 
 	chunks := indexer.splitBySize(content, indexer.chunkSize, indexer.chunkOverlap)
-	
+
 	t.Logf("Generated %d chunks:", len(chunks))
 	for i, chunk := range chunks {
 		t.Logf("Chunk %d (len=%d): %q", i, len(chunk), chunk)
@@ -131,7 +131,7 @@ func TestSpecificOverlapBoundaryCase(t *testing.T) {
 			cascadeChunks++
 		}
 	}
-	
+
 	if cascadeChunks > 3 {
 		t.Errorf("Found cascade of %d tiny chunks at the end", cascadeChunks)
 	}
@@ -143,7 +143,7 @@ func buildTestContent() string {
 	// 1. Main content that exceeds chunk size
 	// 2. Several sections
 	// 3. Ends with a short template line
-	
+
 	content := `202508181811
 Categories: Strategy
 Tags: 
