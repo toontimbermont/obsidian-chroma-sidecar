@@ -429,7 +429,7 @@ func generateDocumentID(filePath string) string {
 func generateChunkID(filePath string, chunkIndex int) string {
 	// Clean and normalize the path
 	cleanPath := filepath.Clean(filePath)
-	
+
 	// Normalize Unicode characters in the file path to ensure consistent ID generation
 	// This prevents issues with files that have accented characters in their names
 	normalizedPath := normalizeUnicode(cleanPath)
@@ -452,55 +452,134 @@ func normalizeUnicode(text string) string {
 		"\u201D": "\"", // Right double quotation mark (U+201D)
 		"\u2018": "'",  // Left single quotation mark (U+2018)
 		"\u2019": "'",  // Right single quotation mark (U+2019)
-		
+
 		// Dashes
-		"\u2013": "-",  // En dash (U+2013)
-		"\u2014": "-",  // Em dash (U+2014)
-		
+		"\u2013": "-", // En dash (U+2013)
+		"\u2014": "-", // Em dash (U+2014)
+
 		// Other common typographic characters
-		"\u2026": "...", // Horizontal ellipsis (U+2026)
-		"\u2022": "*",   // Bullet (U+2022)
-		"\u00A9": "(c)", // Copyright sign (U+00A9)
-		"\u00AE": "(r)", // Registered sign (U+00AE)
+		"\u2026": "...",  // Horizontal ellipsis (U+2026)
+		"\u2022": "*",    // Bullet (U+2022)
+		"\u00A9": "(c)",  // Copyright sign (U+00A9)
+		"\u00AE": "(r)",  // Registered sign (U+00AE)
 		"\u2122": "(tm)", // Trademark sign (U+2122)
-		
+
 		// Non-breaking spaces and similar
-		"\u00A0": " ",   // Non-breaking space (U+00A0)
-		"\u2000": " ",   // En quad (U+2000)
-		"\u2001": " ",   // Em quad (U+2001)
-		"\u2002": " ",   // En space (U+2002)
-		"\u2003": " ",   // Em space (U+2003)
-		"\u2004": " ",   // Three-per-em space (U+2004)
-		"\u2005": " ",   // Four-per-em space (U+2005)
-		"\u2006": " ",   // Six-per-em space (U+2006)
-		"\u200B": "",    // Zero width space (U+200B)
+		"\u00A0": " ", // Non-breaking space (U+00A0)
+		"\u2000": " ", // En quad (U+2000)
+		"\u2001": " ", // Em quad (U+2001)
+		"\u2002": " ", // En space (U+2002)
+		"\u2003": " ", // Em space (U+2003)
+		"\u2004": " ", // Three-per-em space (U+2004)
+		"\u2005": " ", // Four-per-em space (U+2005)
+		"\u2006": " ", // Six-per-em space (U+2006)
+		"\u200B": "",  // Zero width space (U+200B)
 	}
-	
+
 	// Apply typographic character replacements
 	for unicode, ascii := range typographicReplacements {
 		text = strings.ReplaceAll(text, unicode, ascii)
 	}
-	
+
+	// Remove emojis that cause tokenization issues in ChromaDB
+	// Emojis are typically in Unicode ranges:
+	// - Emoticons: U+1F600–U+1F64F
+	// - Miscellaneous Symbols: U+1F300–U+1F5FF
+	// - Transport and Map Symbols: U+1F680–U+1F6FF
+	// - Additional Emoticons: U+1F900–U+1F9FF
+	// - Symbols and Pictographs: U+1F1E6–U+1F1FF (flags)
+	// And many others scattered throughout Unicode
+	text = removeEmojis(text)
+
 	// Then apply Unicode normalization to remove diacritics (accents)
 	// This transforms accented characters like 'é', 'è', 'ë' to their base form 'e'
-	// 
+	//
 	// The process:
 	// 1. NFD (Normalization Form Decomposed) - separates base characters from combining marks
-	// 2. RemoveFunc - removes nonspacing marks (accents, diacritics) 
+	// 2. RemoveFunc - removes nonspacing marks (accents, diacritics)
 	// 3. NFC (Normalization Form Composed) - recomposes the remaining characters
-	
+
 	isMn := func(r rune) bool {
 		return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks (diacritics)
 	}
-	
+
 	t := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
 	result, _, err := transform.String(t, text)
 	if err != nil {
 		// Fallback to original text if transformation fails
 		return text
 	}
-	
+
 	return result
+}
+
+// removeEmojis removes emoji characters that cause tokenization issues in ChromaDB
+// This function removes characters from common emoji Unicode ranges to ensure
+// consistent tokenization and prevent tensor shape mismatches
+func removeEmojis(text string) string {
+	var result strings.Builder
+	result.Grow(len(text)) // Pre-allocate capacity
+
+	for _, r := range text {
+		// Check if the rune is an emoji by testing common Unicode ranges
+		if isEmoji(r) {
+			// Skip emoji characters (remove them)
+			continue
+		}
+		result.WriteRune(r)
+	}
+
+	// Clean up multiple spaces that may result from emoji removal
+	cleaned := result.String()
+	cleaned = regexp.MustCompile(`\s+`).ReplaceAllString(cleaned, " ")
+	return strings.TrimSpace(cleaned)
+}
+
+// isEmoji checks if a rune is an emoji character
+// This covers the most common emoji Unicode ranges that cause tokenization issues
+func isEmoji(r rune) bool {
+	// Emoticons (U+1F600–U+1F64F)
+	if r >= 0x1F600 && r <= 0x1F64F {
+		return true
+	}
+
+	// Miscellaneous Symbols and Pictographs (U+1F300–U+1F5FF)
+	if r >= 0x1F300 && r <= 0x1F5FF {
+		return true
+	}
+
+	// Transport and Map Symbols (U+1F680–U+1F6FF)
+	if r >= 0x1F680 && r <= 0x1F6FF {
+		return true
+	}
+
+	// Additional Emoticons (U+1F900–U+1F9FF)
+	if r >= 0x1F900 && r <= 0x1F9FF {
+		return true
+	}
+
+	// Symbols and Pictographs Extended-A (U+1FA70–U+1FAFF)
+	if r >= 0x1FA70 && r <= 0x1FAFF {
+		return true
+	}
+
+	// Regional Indicator Symbols (flags) (U+1F1E6–U+1F1FF)
+	if r >= 0x1F1E6 && r <= 0x1F1FF {
+		return true
+	}
+
+	// Some additional common emoji ranges
+	// Miscellaneous Symbols (U+2600–U+26FF) - includes ☕
+	if r >= 0x2600 && r <= 0x26FF {
+		return true
+	}
+
+	// Dingbats (U+2700–U+27BF)
+	if r >= 0x2700 && r <= 0x27BF {
+		return true
+	}
+
+	return false
 }
 
 // processFileWithChunks processes a file and returns chunks with file info including content hash
@@ -1006,6 +1085,10 @@ func (idx *ObsidianIndexer) cleanContent(content string) string {
 	// Remove YAML frontmatter
 	frontmatterRegex := regexp.MustCompile(`(?s)^---.*?---\s*`)
 	content = frontmatterRegex.ReplaceAllString(content, "")
+
+	// Remove repetitive headers (Related Notes/References) that appear in many documents
+	repetitiveHeaderRegex := regexp.MustCompile(`(?mi)^#+\s*(Related Notes?|References?)\s*$`)
+	content = repetitiveHeaderRegex.ReplaceAllString(content, "")
 
 	// Remove markdown links but keep link text: [text](url) -> text
 	// This must be done BEFORE removing standalone URLs

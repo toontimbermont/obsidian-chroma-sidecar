@@ -178,6 +178,94 @@ FROM ""
 ` + "```",
 			expected: "Content before dataview",
 		},
+		// NEW TESTS FOR REPETITIVE HEADER REMOVAL
+		{
+			name: "Remove # Related Notes header",
+			input: `Some content
+
+# Related Notes
+
+- [[Note 1]]
+- [[Note 2]]
+
+More content`,
+			expected: "Some content - Note 1 - Note 2 More content",
+		},
+		{
+			name: "Remove # References header",
+			input: `Some content
+
+# References
+
+- [Book 1](https://example.com)
+- [Book 2](https://example2.com)
+
+More content`,
+			expected: "Some content - Book 1 - Book 2 More content",
+		},
+		{
+			name: "Remove ## Related Notes header (with 2 hashes)",
+			input: `## Related Notes
+
+- [[Strategy]]
+- [[Business]]`,
+			expected: "- Strategy - Business",
+		},
+		{
+			name: "Remove ### References header (with 3 hashes)",
+			input: `### References
+
+- Important paper
+- Research article`,
+			expected: "- Important paper - Research article",
+		},
+		{
+			name: "Remove # Related Note header (singular)",
+			input: `# Related Note
+
+[[Single Note]]`,
+			expected: "Single Note",
+		},
+		{
+			name: "Remove # Reference header (singular)",
+			input: `# Reference
+
+[Single Reference](https://example.com)`,
+			expected: "Single Reference",
+		},
+		{
+			name: "Preserve other headers but remove repetitive ones",
+			input: `# Main Topic
+
+Content here
+
+## Related Notes
+
+- [[Note 1]]
+
+# Summary
+
+Final thoughts
+
+## References
+
+- [Book](https://example.com)`,
+			expected: "# Main Topic Content here - Note 1 # Summary Final thoughts - Book",
+		},
+		{
+			name: "Case insensitive matching for related notes",
+			input: `# related notes
+
+- [[Note 1]]`,
+			expected: "- Note 1",
+		},
+		{
+			name: "Case insensitive matching for references",
+			input: `# REFERENCES
+
+- [Book](https://example.com)`,
+			expected: "- Book",
+		},
 	}
 
 	for _, tt := range tests {
@@ -278,4 +366,72 @@ func contains(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestNormalizeUnicode(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Remove emojis from Strategy file content",
+			input:    "Getting crystal clear on your strategy 🎯",
+			expected: "Getting crystal clear on your strategy",
+		},
+		{
+			name:     "Remove party emoji",
+			input:    "avoid waste 🎉",
+			expected: "avoid waste",
+		},
+		{
+			name:     "Remove flexed bicep emoji",
+			input:    "Let's learn and grow together! 💪",
+			expected: "Let's learn and grow together!",
+		},
+		{
+			name:     "Remove multiple emojis",
+			input:    "time and mental space 🕐 🧠 No surprise there",
+			expected: "time and mental space No surprise there",
+		},
+		{
+			name:     "Remove smiling face emojis",
+			input:    "24 hours a day 😄 hit a writers block 😅",
+			expected: "24 hours a day hit a writers block",
+		},
+		{
+			name:     "Remove eyes emoji",
+			input:    "👀 For the attentive readers",
+			expected: "For the attentive readers",
+		},
+		{
+			name:     "Keep existing functionality - diacritics",
+			input:    "café naïve résumé",
+			expected: "cafe naive resume",
+		},
+		{
+			name:     "Keep existing functionality - smart quotes",
+			input:    "\u201CHello\u201D and \u2018world\u2019",
+			expected: "\"Hello\" and 'world'",
+		},
+		{
+			name:     "Mixed emojis and diacritics",
+			input:    "Resumé complete! 🎉 Café time ☕",
+			expected: "Resume complete! Cafe time",
+		},
+		{
+			name:     "Text without emojis or special chars",
+			input:    "Regular text should remain unchanged",
+			expected: "Regular text should remain unchanged",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeUnicode(tt.input)
+			if result != tt.expected {
+				t.Errorf("normalizeUnicode(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
 }
