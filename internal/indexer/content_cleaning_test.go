@@ -42,7 +42,7 @@ func TestCleanContent(t *testing.T) {
 			name: "Complex real-world example from Strategy Books",
 			input: `11. [**Good Strategy Bad Strategy** by Richard Rumelt](https://revopsteam.com/revops-strategy/business-strategy-books/#good-strategy-bad-strategy)
 12. [**Blue Ocean Strategy** by W. Chan Kim and Renée Mauborgne](https://revopsteam.com/revops-strategy/business-strategy-books/#blue-ocean-strategy)`,
-			expected: "11. **Good Strategy Bad Strategy** by Richard Rumelt 12. **Blue Ocean Strategy** by W. Chan Kim and Renée Mauborgne",
+			expected: "11. **Good Strategy Bad Strategy** by Richard Rumelt 12. **Blue Ocean Strategy** by W. Chan Kim and Renee Mauborgne",
 		},
 		{
 			name:     "Remove multiple URLs in one line",

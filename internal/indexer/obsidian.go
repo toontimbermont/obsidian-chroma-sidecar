@@ -13,7 +13,11 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
+
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 
 	"obsidian-ai-agent/internal/chroma"
 )
@@ -425,11 +429,41 @@ func generateDocumentID(filePath string) string {
 func generateChunkID(filePath string, chunkIndex int) string {
 	// Clean and normalize the path
 	cleanPath := filepath.Clean(filePath)
+	
+	// Normalize Unicode characters in the file path to ensure consistent ID generation
+	// This prevents issues with files that have accented characters in their names
+	normalizedPath := normalizeUnicode(cleanPath)
 
-	// Create MD5 hash of the path and chunk index for consistent ID generation
-	chunkKey := fmt.Sprintf("%s_chunk_%d", cleanPath, chunkIndex)
+	// Create MD5 hash of the normalized path and chunk index for consistent ID generation
+	chunkKey := fmt.Sprintf("%s_chunk_%d", normalizedPath, chunkIndex)
 	hash := md5.Sum([]byte(chunkKey))
 	return fmt.Sprintf("%x", hash)
+}
+
+// normalizeUnicode converts Unicode accented characters to their ASCII equivalents
+// This ensures consistent tokenization across different languages and prevents
+// tensor shape mismatches in ChromaDB embedding
+func normalizeUnicode(text string) string {
+	// Use Go's standard unicode normalization to remove diacritics (accents)
+	// This transforms accented characters like 'é', 'è', 'ë' to their base form 'e'
+	// 
+	// The process:
+	// 1. NFD (Normalization Form Decomposed) - separates base characters from combining marks
+	// 2. RemoveFunc - removes nonspacing marks (accents, diacritics) 
+	// 3. NFC (Normalization Form Composed) - recomposes the remaining characters
+	
+	isMn := func(r rune) bool {
+		return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks (diacritics)
+	}
+	
+	t := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
+	result, _, err := transform.String(t, text)
+	if err != nil {
+		// Fallback to original text if transformation fails
+		return text
+	}
+	
+	return result
 }
 
 // processFileWithChunks processes a file and returns chunks with file info including content hash
@@ -952,6 +986,10 @@ func (idx *ObsidianIndexer) cleanContent(content string) string {
 	// Remove excessive whitespace and normalize
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
 	content = strings.TrimSpace(content)
+
+	// Normalize Unicode characters to ASCII equivalents to ensure consistent tokenization
+	// This prevents tensor shape mismatches in ChromaDB embedding
+	content = normalizeUnicode(content)
 
 	return content
 }

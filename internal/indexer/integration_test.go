@@ -79,12 +79,13 @@ func TestIntegrationVaultIndexing(t *testing.T) {
 	}
 
 	// Create indexer with test configuration
+	// Using BatchSize=1 to isolate tensor shape issues to specific documents
 	indexerConfig := &Config{
 		VaultPath:    testVaultPath,
-		BatchSize:    10,
+		BatchSize:    1,
 		Directories:  []string{"notes"},
-		ChunkSize:    1000,
-		ChunkOverlap: 100,
+		ChunkSize:    2000,
+		ChunkOverlap: 200,
 	}
 
 	indexer := NewObsidianIndexer(client, indexerConfig)
