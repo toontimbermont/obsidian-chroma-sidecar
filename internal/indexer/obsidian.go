@@ -172,7 +172,7 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 				result.BatchesUploaded++
 				log.Printf("Upserted batch of %d documents from %d files: %v", len(documents), len(batchFiles), batchFiles)
 			}
-			documents = documents[:0] // Reset slice
+			documents = documents[:0]   // Reset slice
 			batchFiles = batchFiles[:0] // Reset file tracking
 		}
 	}
@@ -194,7 +194,7 @@ func (idx *ObsidianIndexer) ReindexVault(ctx context.Context, directories []stri
 
 	log.Printf("Indexing complete. Processed: %d, New: %d, Updated: %d, Skipped: %d, Batches: %d, Errors: %d",
 		result.ProcessedFiles, result.IndexedFiles, result.UpdatedFiles, result.SkippedFiles, result.BatchesUploaded, len(result.Errors))
-	
+
 	// Log detailed error information if there were any failures
 	if len(result.Errors) > 0 {
 		log.Printf("Indexing errors encountered:")
@@ -474,13 +474,13 @@ func (idx *ObsidianIndexer) processFileWithChunks(filePath string) ([]chroma.Doc
 
 	// Extract frontmatter and enhance content before processing
 	enhancedContent, frontmatterMetadata := idx.enhanceContentWithFrontmatter(contentStr, filePath)
-	
+
 	// Clean enhanced content before chunking
 	cleanedContent := idx.cleanContent(enhancedContent)
 
 	// Split content into chunks
 	chunks := idx.chunkContent(cleanedContent, filePath)
-	
+
 	// Add frontmatter metadata to each chunk
 	for i := range chunks {
 		// Merge frontmatter metadata with existing chunk metadata
@@ -609,7 +609,7 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 
 	var chunks []string
 	start := 0
-	
+
 	// Minimum meaningful chunk size to prevent tiny chunks at boundaries
 	minChunkSize := 50 // Minimum 50 characters for meaningful content
 
@@ -637,7 +637,7 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 
 		// Calculate next start position with overlap
 		nextStart := end - overlap
-		
+
 		// Prevent cascading tiny chunks at document boundaries
 		if nextStart <= start {
 			// If overlap would cause us to go backwards or stay in place,
@@ -655,7 +655,7 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 			// Otherwise ensure we make minimal progress (but still prevent infinite loop)
 			nextStart = start + 1
 		}
-		
+
 		// Additional check: if remaining content would create cascading tiny chunks, stop
 		remainingFromNext := len(content) - nextStart
 		if remainingFromNext <= minChunkSize {
@@ -672,7 +672,7 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 			}
 			break
 		}
-		
+
 		start = nextStart
 
 		// Safety check: if we're at the end, break
@@ -687,13 +687,13 @@ func (idx *ObsidianIndexer) splitBySize(content string, chunkSize, overlap int) 
 // extractFrontmatter parses Obsidian-style frontmatter and returns structured data plus body content
 func (idx *ObsidianIndexer) extractFrontmatter(content string) (map[string]interface{}, string) {
 	frontmatter := make(map[string]interface{})
-	
+
 	// Check if content starts with frontmatter (no YAML --- markers in Obsidian style)
 	lines := strings.Split(content, "\n")
 	if len(lines) == 0 {
 		return frontmatter, content
 	}
-	
+
 	separatorIndex := -1
 	for i, line := range lines {
 		if strings.TrimSpace(line) == "---" {
@@ -701,32 +701,32 @@ func (idx *ObsidianIndexer) extractFrontmatter(content string) (map[string]inter
 			break
 		}
 	}
-	
+
 	// If no separator found, treat entire content as body
 	if separatorIndex == -1 {
 		return frontmatter, content
 	}
-	
+
 	// Parse frontmatter lines
 	for i := 0; i < separatorIndex; i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		
+
 		// Parse created date (first line if it's just numbers)
 		if i == 0 && regexp.MustCompile(`^\d+$`).MatchString(line) {
 			frontmatter["created_date"] = line
 			continue
 		}
-		
+
 		// Parse key-value pairs
 		if strings.Contains(line, ":") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
 				key := strings.TrimSpace(strings.ToLower(parts[0]))
 				value := strings.TrimSpace(parts[1])
-				
+
 				switch key {
 				case "categories":
 					if categories := idx.parseCategories(value); len(categories) > 0 {
@@ -740,23 +740,23 @@ func (idx *ObsidianIndexer) extractFrontmatter(content string) (map[string]inter
 			}
 		}
 	}
-	
+
 	// Extract body content (everything after separator)
 	bodyLines := lines[separatorIndex+1:]
 	body := strings.Join(bodyLines, "\n")
 	body = strings.TrimSpace(body)
-	
+
 	return frontmatter, body
 }
 
 // parseCategories extracts categories from Obsidian-style [[Category]] format
 func (idx *ObsidianIndexer) parseCategories(value string) []string {
 	var categories []string
-	
+
 	// Match [[Category Name]] patterns
 	categoryRegex := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
 	matches := categoryRegex.FindAllStringSubmatch(value, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			category := strings.TrimSpace(match[1])
@@ -765,18 +765,18 @@ func (idx *ObsidianIndexer) parseCategories(value string) []string {
 			}
 		}
 	}
-	
+
 	return categories
 }
 
 // parseTags extracts tags from comma-separated format
 func (idx *ObsidianIndexer) parseTags(value string) []string {
 	var tags []string
-	
+
 	if strings.TrimSpace(value) == "" {
 		return tags
 	}
-	
+
 	// Split by comma and clean up
 	parts := strings.Split(value, ",")
 	for _, part := range parts {
@@ -785,14 +785,14 @@ func (idx *ObsidianIndexer) parseTags(value string) []string {
 			tags = append(tags, tag)
 		}
 	}
-	
+
 	return tags
 }
 
 // frontmatterToContent converts frontmatter metadata to readable content
 func (idx *ObsidianIndexer) frontmatterToContent(frontmatter map[string]interface{}) string {
 	var parts []string
-	
+
 	// Add categories if present
 	if categories, ok := frontmatter["categories"].([]string); ok && len(categories) > 0 {
 		if len(categories) == 1 {
@@ -805,26 +805,26 @@ func (idx *ObsidianIndexer) frontmatterToContent(frontmatter map[string]interfac
 			parts = append(parts, fmt.Sprintf("This document covers %s, and %s topics.", categoryList, categories[len(categories)-1]))
 		}
 	}
-	
+
 	// Add tags if present
 	if tags, ok := frontmatter["tags"].([]string); ok && len(tags) > 0 {
 		tagList := strings.Join(tags, ", ")
 		parts = append(parts, fmt.Sprintf("Tags: %s.", tagList))
 	}
-	
+
 	return strings.Join(parts, " ")
 }
 
 // extractFolderCategories extracts ALL folder levels as categories from file path using vault configuration
 func (idx *ObsidianIndexer) extractFolderCategories(filePath string) []string {
 	categories := make([]string, 0) // Initialize as empty slice, not nil
-	
+
 	// Clean the path and make it absolute if it's relative
 	cleanPath := filepath.Clean(filePath)
 	if !filepath.IsAbs(cleanPath) {
 		cleanPath = filepath.Join(idx.vaultPath, cleanPath)
 	}
-	
+
 	// Convert vault path to absolute for comparison
 	vaultPath := filepath.Clean(idx.vaultPath)
 	if !filepath.IsAbs(vaultPath) {
@@ -833,17 +833,17 @@ func (idx *ObsidianIndexer) extractFolderCategories(filePath string) []string {
 			vaultPath = absVaultPath
 		}
 	}
-	
+
 	// Check if file is within vault
 	relPath, err := filepath.Rel(vaultPath, cleanPath)
 	if err != nil || strings.HasPrefix(relPath, "..") {
 		// File is outside vault
 		return categories
 	}
-	
+
 	// Split the relative path into parts
 	parts := strings.Split(relPath, string(filepath.Separator))
-	
+
 	// Remove empty parts and filename
 	var cleanParts []string
 	for i, part := range parts {
@@ -851,12 +851,12 @@ func (idx *ObsidianIndexer) extractFolderCategories(filePath string) []string {
 			cleanParts = append(cleanParts, part)
 		}
 	}
-	
+
 	// If no folders, return empty
 	if len(cleanParts) == 0 {
 		return categories
 	}
-	
+
 	// Check if first folder is one of our configured directories
 	firstFolder := cleanParts[0]
 	isConfiguredDir := false
@@ -866,13 +866,13 @@ func (idx *ObsidianIndexer) extractFolderCategories(filePath string) []string {
 			break
 		}
 	}
-	
+
 	// If file is in a configured directory, extract ALL folder levels after it
 	if isConfiguredDir && len(cleanParts) > 1 {
 		// Add all folders between configured directory and file as categories
 		categories = append(categories, cleanParts[1:]...)
 	}
-	
+
 	return categories
 }
 
@@ -880,25 +880,25 @@ func (idx *ObsidianIndexer) extractFolderCategories(filePath string) []string {
 func (idx *ObsidianIndexer) enhanceContentWithFrontmatter(content string, filePath string) (string, map[string]interface{}) {
 	// Extract frontmatter from content
 	frontmatter, bodyContent := idx.extractFrontmatter(content)
-	
+
 	// Extract folder-based categories
 	folderCategories := idx.extractFolderCategories(filePath)
-	
+
 	// Merge folder categories with frontmatter categories
 	var allCategories []string
 	if fmCategories, ok := frontmatter["categories"].([]string); ok {
 		allCategories = append(allCategories, fmCategories...)
 	}
 	allCategories = append(allCategories, folderCategories...)
-	
+
 	// Update frontmatter with combined categories
 	if len(allCategories) > 0 {
 		frontmatter["categories"] = allCategories
 	}
-	
+
 	// Convert frontmatter to readable content
 	frontmatterContent := idx.frontmatterToContent(frontmatter)
-	
+
 	// Combine frontmatter content with body content
 	var enhancedContent string
 	if frontmatterContent != "" && bodyContent != "" {
@@ -908,7 +908,7 @@ func (idx *ObsidianIndexer) enhanceContentWithFrontmatter(content string, filePa
 	} else {
 		enhancedContent = bodyContent
 	}
-	
+
 	return enhancedContent, frontmatter
 }
 
@@ -921,13 +921,17 @@ func (idx *ObsidianIndexer) convertMetadataValue(value interface{}) interface{} 
 		}
 		return strings.Join(strSlice, ", ")
 	}
-	
+
 	// Return other types as-is (strings, numbers, booleans are supported by ChromaDB)
 	return value
 }
 
 // cleanContent removes URLs and other problematic content that can cause tokenization issues
 func (idx *ObsidianIndexer) cleanContent(content string) string {
+	// Remove dataview blocks (```dataview ... ```)
+	dataviewRegex := regexp.MustCompile(`(?s)` + "```dataview.*?```")
+	content = dataviewRegex.ReplaceAllString(content, "")
+
 	// Remove YAML frontmatter
 	frontmatterRegex := regexp.MustCompile(`(?s)^---.*?---\s*`)
 	content = frontmatterRegex.ReplaceAllString(content, "")

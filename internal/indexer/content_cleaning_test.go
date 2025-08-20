@@ -102,6 +102,82 @@ Also see [[Internal Link]] for more.`,
 			input:    "Read [**Bold Link Text**](https://example.com/path)",
 			expected: "Read **Bold Link Text**",
 		},
+		{
+			name: "Remove simple dataview block",
+			input: `Some content before
+
+` + "```dataview" + `
+TABLE file.name as Name, file.mtime as Modified
+FROM ""
+SORT file.mtime DESC
+` + "```" + `
+
+Some content after`,
+			expected: "Some content before Some content after",
+		},
+		{
+			name: "Remove multiple dataview blocks",
+			input: `First section
+
+` + "```dataview" + `
+LIST
+FROM ""
+` + "```" + `
+
+Middle section
+
+` + "```dataview" + `
+TABLE file.name
+FROM ""
+WHERE contains(file.path, "project")
+` + "```" + `
+
+Last section`,
+			expected: "First section Middle section Last section",
+		},
+		{
+			name: "Remove dataview block with complex content",
+			input: `# My Notes
+
+` + "```dataview" + `
+TABLE WITHOUT ID
+	file.link as "Note",
+	file.mtime as "Modified",
+	length(file.outlinks) as "Outlinks"
+FROM ""
+WHERE file.name != "index"
+SORT file.mtime DESC
+LIMIT 10
+` + "```" + `
+
+This is the actual content.`,
+			expected: "# My Notes This is the actual content.",
+		},
+		{
+			name:     "No dataview blocks to remove",
+			input:    "Regular content with no dataview blocks",
+			expected: "Regular content with no dataview blocks",
+		},
+		{
+			name: "Dataview block at start of file",
+			input: "```dataview" + `
+LIST
+FROM ""
+` + "```" + `
+
+Content after dataview`,
+			expected: "Content after dataview",
+		},
+		{
+			name: "Dataview block at end of file",
+			input: `Content before dataview
+
+` + "```dataview" + `
+TABLE file.name
+FROM ""
+` + "```",
+			expected: "Content before dataview",
+		},
 	}
 
 	for _, tt := range tests {
