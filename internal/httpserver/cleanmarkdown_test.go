@@ -137,7 +137,7 @@ short mode
 	t.Logf("User reported:  %q", userReportedOutput)
 
 	assert.NotEqual(t, userReportedOutput, result, "Test result should differ from user's reported output")
-	
+
 	t.Logf("✅ EXPECTED: My test differs from user's output")
 	t.Logf("📝 CONCLUSION:")
 	t.Logf("   1. Current cleanMarkdown correctly removes code blocks (including tasks blocks)")

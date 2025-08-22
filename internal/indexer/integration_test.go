@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"obsidian-ai-agent/internal/chroma"
 )
 
@@ -39,17 +41,15 @@ func TestIntegrationVaultIndexing(t *testing.T) {
 	}
 
 	// Setup test ChromaDB container
-	if err := setupTestChromaDB(t); err != nil {
-		t.Fatalf("Failed to setup test ChromaDB: %v", err)
-	}
+	err := setupTestChromaDB(t)
+	require.NoError(t, err, "Failed to setup test ChromaDB")
 
 	// Cleanup container when test finishes
 	defer cleanupTestChromaDB(t)
 
 	// Wait for ChromaDB to be ready
-	if err := waitForChromaDB(t); err != nil {
-		t.Fatalf("ChromaDB failed to start: %v", err)
-	}
+	err = waitForChromaDB(t)
+	require.NoError(t, err, "ChromaDB failed to start")
 
 	// Create ChromaDB client for testing
 	ctx := context.Background()
@@ -60,17 +60,14 @@ func TestIntegrationVaultIndexing(t *testing.T) {
 	}
 
 	client, err := chroma.NewClient(ctx, config)
-	if err != nil {
-		t.Fatalf("Failed to create ChromaDB client: %v", err)
-	}
+	require.NoError(t, err, "Failed to create ChromaDB client")
 
 	// Set test vault path (relative to project root)
 	testVaultPath := filepath.Join("..", "..", "test_vault")
 
 	// Verify test vault exists
-	if _, err := os.Stat(testVaultPath); os.IsNotExist(err) {
-		t.Fatalf("Test vault directory %s does not exist", testVaultPath)
-	}
+	_, err = os.Stat(testVaultPath)
+	require.False(t, os.IsNotExist(err), "Test vault directory %s does not exist", testVaultPath)
 
 	// Clean any existing index file in test vault to ensure fresh indexing
 	indexFile := filepath.Join(testVaultPath, ".obsidian_index.json")
@@ -92,51 +89,33 @@ func TestIntegrationVaultIndexing(t *testing.T) {
 
 	// Perform indexing
 	result, err := indexer.ReindexVault(ctx, []string{"notes"})
-	if err != nil {
-		t.Fatalf("Failed to index test vault: %v", err)
-	}
+	require.NoError(t, err, "Failed to index test vault")
 
 	// Verify indexing results
 	t.Logf("Indexing results: Processed=%d, Indexed=%d, Updated=%d, Skipped=%d, Batches=%d, Errors=%d",
 		result.ProcessedFiles, result.IndexedFiles, result.UpdatedFiles,
 		result.SkippedFiles, result.BatchesUploaded, len(result.Errors))
 
-	if len(result.Errors) > 0 {
-		t.Errorf("Indexing had %d errors: %v", len(result.Errors), result.Errors)
-	}
-
-	if result.ProcessedFiles == 0 {
-		t.Error("Expected at least 1 processed file")
-	}
-
-	if result.IndexedFiles == 0 && result.UpdatedFiles == 0 {
-		t.Error("Expected at least 1 indexed or updated file")
-	}
+	assert.Empty(t, result.Errors, "Indexing had %d errors: %v", len(result.Errors), result.Errors)
+	assert.Greater(t, result.ProcessedFiles, 0, "Expected at least 1 processed file")
+	assert.True(t, result.IndexedFiles > 0 || result.UpdatedFiles > 0,
+		"Expected at least 1 indexed or updated file")
 
 	// Verify documents were actually stored in ChromaDB
 	docCount, err := client.GetDocumentCount(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get document count: %v", err)
-	}
-
-	if docCount == 0 {
-		t.Error("Expected documents to be stored in ChromaDB, but found 0")
-	}
+	require.NoError(t, err, "Failed to get document count")
+	assert.Greater(t, docCount, 0, "Expected documents to be stored in ChromaDB, but found 0")
 
 	t.Logf("Successfully indexed %d documents in ChromaDB", docCount)
 
 	// Test search functionality
 	searchResults, err := client.Query(ctx, "ChromaDB chunking", 3)
-	if err != nil {
-		t.Fatalf("Failed to perform search query: %v", err)
-	}
+	require.NoError(t, err, "Failed to perform search query")
 
 	// Extract documents from query result
 	docGroups := searchResults.GetDocumentsGroups()
-	if len(docGroups) == 0 || len(docGroups[0]) == 0 {
-		t.Error("Expected search results, but got none")
-		return
-	}
+	require.NotEmpty(t, docGroups, "Expected search results, but got none")
+	require.NotEmpty(t, docGroups[0], "Expected search results, but got none")
 
 	documents := docGroups[0]
 	t.Logf("Search returned %d results", len(documents))
@@ -151,9 +130,7 @@ func TestIntegrationVaultIndexing(t *testing.T) {
 		}
 	}
 
-	if !foundRelevantContent {
-		t.Error("Search results don't contain expected relevant content")
-	}
+	assert.True(t, foundRelevantContent, "Search results don't contain expected relevant content")
 }
 
 // setupTestChromaDB starts a ChromaDB container for testing

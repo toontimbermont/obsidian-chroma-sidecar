@@ -1,8 +1,9 @@
 package indexer
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestFrontmatterExtraction tests the extraction and parsing of YAML frontmatter
@@ -102,13 +103,8 @@ Tags:
 		t.Run(tt.name, func(t *testing.T) {
 			matter, body := indexer.extractFrontmatter(tt.content)
 
-			if !reflect.DeepEqual(matter, tt.expectedMatter) {
-				t.Errorf("extractFrontmatter() matter = %v, want %v", matter, tt.expectedMatter)
-			}
-
-			if body != tt.expectedBody {
-				t.Errorf("extractFrontmatter() body = %q, want %q", body, tt.expectedBody)
-			}
+			assert.Equal(t, tt.expectedMatter, matter, "frontmatter extraction mismatch")
+			assert.Equal(t, tt.expectedBody, body, "body extraction mismatch")
 		})
 	}
 }
@@ -162,9 +158,7 @@ func TestFrontmatterToContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.frontmatterToContent(tt.frontmatter)
-			if result != tt.expectedText {
-				t.Errorf("frontmatterToContent() = %q, want %q", result, tt.expectedText)
-			}
+			assert.Equal(t, tt.expectedText, result, "frontmatter to content conversion mismatch")
 		})
 	}
 }
@@ -228,9 +222,7 @@ func TestExtractFolderCategories(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.extractFolderCategories(tt.filePath)
-			if !reflect.DeepEqual(result, tt.expectedCategories) {
-				t.Errorf("extractFolderCategories() = %v, want %v", result, tt.expectedCategories)
-			}
+			assert.Equal(t, tt.expectedCategories, result, "folder categories extraction mismatch")
 		})
 	}
 }
@@ -302,13 +294,8 @@ Categories: [[AI]]
 		t.Run(tt.name, func(t *testing.T) {
 			enhancedContent, metadata := indexer.enhanceContentWithFrontmatter(tt.originalContent, tt.filePath)
 
-			if enhancedContent != tt.expectedContent {
-				t.Errorf("enhanceContentWithFrontmatter() content = %q, want %q", enhancedContent, tt.expectedContent)
-			}
-
-			if !reflect.DeepEqual(metadata, tt.expectedMetadata) {
-				t.Errorf("enhanceContentWithFrontmatter() metadata = %v, want %v", metadata, tt.expectedMetadata)
-			}
+			assert.Equal(t, tt.expectedContent, enhancedContent, "enhanced content mismatch")
+			assert.Equal(t, tt.expectedMetadata, metadata, "metadata mismatch")
 		})
 	}
 }
@@ -357,9 +344,7 @@ func TestConvertMetadataValue(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.convertMetadataValue(tt.input)
-			if result != tt.expected {
-				t.Errorf("convertMetadataValue() = %v (%T), want %v (%T)", result, result, tt.expected, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "metadata value conversion mismatch")
 		})
 	}
 }

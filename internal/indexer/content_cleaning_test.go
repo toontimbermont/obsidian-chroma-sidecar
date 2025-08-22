@@ -2,6 +2,8 @@ package indexer
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCleanContent(t *testing.T) {
@@ -271,9 +273,7 @@ Final thoughts
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.cleanContent(tt.input)
-			if result != tt.expected {
-				t.Errorf("cleanContent() = %q, expected %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "content cleaning mismatch")
 		})
 	}
 }
@@ -321,9 +321,7 @@ func TestCleanContentEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.cleanContent(tt.input)
-			if result != tt.expected {
-				t.Errorf("cleanContent() = %q, expected %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "edge case content cleaning mismatch")
 		})
 	}
 }
@@ -342,14 +340,10 @@ See also [[Strategy]] for related topics.`
 	expected := `# Strategy Books 1. "Competitive Strategy" by Michael E. Porter: Classic strategy book. 2. **Good Strategy Bad Strategy** by Richard Rumelt See also Strategy for related topics.`
 
 	result := indexer.cleanContent(input)
-	if result != expected {
-		t.Errorf("cleanContent() did not preserve semantic meaning:\nGot: %q\nExpected: %q", result, expected)
-	}
+	assert.Equal(t, expected, result, "semantic meaning preservation mismatch")
 
 	// Ensure the result doesn't contain any URLs
-	if containsURL(result) {
-		t.Errorf("cleanContent() result still contains URLs: %q", result)
-	}
+	assert.False(t, containsURL(result), "cleanContent() result still contains URLs: %q", result)
 }
 
 // Helper function to check if text contains URLs
@@ -429,9 +423,7 @@ func TestNormalizeUnicode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := normalizeUnicode(tt.input)
-			if result != tt.expected {
-				t.Errorf("normalizeUnicode(%q) = %q, expected %q", tt.input, result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result, "unicode normalization mismatch")
 		})
 	}
 }

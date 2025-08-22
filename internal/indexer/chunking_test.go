@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestSplitByHeaders tests the header-based splitting functionality
@@ -92,18 +95,11 @@ More content`,
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.splitByHeaders(tt.content)
 
-			if len(result) != len(tt.expected) {
-				t.Errorf("splitByHeaders() got %d chunks, want %d", len(result), len(tt.expected))
-				for i, chunk := range result {
-					t.Logf("Chunk %d: %q", i, chunk)
-				}
-				return
-			}
+			require.Len(t, result, len(tt.expected), "splitByHeaders() chunk count mismatch")
 
 			for i, chunk := range result {
-				if strings.TrimSpace(chunk) != strings.TrimSpace(tt.expected[i]) {
-					t.Errorf("splitByHeaders() chunk %d = %q, want %q", i, chunk, tt.expected[i])
-				}
+				assert.Equal(t, strings.TrimSpace(tt.expected[i]), strings.TrimSpace(chunk),
+					"chunk %d content mismatch", i)
 			}
 		})
 	}
@@ -154,25 +150,19 @@ func TestSplitBySize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.splitBySize(tt.content, tt.chunkSize, tt.overlap)
 
-			if len(result) < tt.minChunks || len(result) > tt.maxChunks {
-				t.Errorf("splitBySize() got %d chunks, want between %d and %d",
-					len(result), tt.minChunks, tt.maxChunks)
-			}
+			assert.GreaterOrEqual(t, len(result), tt.minChunks, "too few chunks")
+			assert.LessOrEqual(t, len(result), tt.maxChunks, "too many chunks")
 
 			// Verify each chunk is within size limits
 			for i, chunk := range result {
-				if len(chunk) > tt.chunkSize+50 { // Allow some tolerance for word boundaries
-					t.Errorf("splitBySize() chunk %d length %d exceeds chunk size %d",
-						i, len(chunk), tt.chunkSize)
-				}
+				assert.LessOrEqual(t, len(chunk), tt.chunkSize+50,
+					"chunk %d length %d exceeds chunk size %d", i, len(chunk), tt.chunkSize)
 			}
 
 			// Verify all content is preserved
 			combined := strings.Join(result, "")
-			if len(combined) < len(tt.content) {
-				t.Errorf("splitBySize() lost content: original %d chars, combined %d chars",
-					len(tt.content), len(combined))
-			}
+			assert.GreaterOrEqual(t, len(combined), len(tt.content),
+				"lost content: original %d chars, combined %d chars", len(tt.content), len(combined))
 		})
 	}
 }
@@ -235,37 +225,25 @@ Short section.`,
 		t.Run(tt.name, func(t *testing.T) {
 			result := indexer.chunkContent(tt.content, tt.filePath)
 
-			if len(result) < 1 {
-				t.Errorf("chunkContent() returned no chunks")
-				return
-			}
+			require.NotEmpty(t, result, "chunkContent() returned no chunks")
 
 			// Verify all chunks have required metadata
 			for i, chunk := range result {
-				if chunk.ID == "" {
-					t.Errorf("chunkContent() chunk %d missing ID", i)
-				}
-				if chunk.Content == "" {
-					t.Errorf("chunkContent() chunk %d missing content", i)
-				}
-				if chunk.Metadata["path"] != tt.filePath {
-					t.Errorf("chunkContent() chunk %d wrong path: got %v, want %s",
-						i, chunk.Metadata["path"], tt.filePath)
-				}
-				if chunk.Metadata["chunk_index"] == nil {
-					t.Errorf("chunkContent() chunk %d missing chunk_index", i)
-				}
-				if chunk.Metadata["chunk_type"] == nil {
-					t.Errorf("chunkContent() chunk %d missing chunk_type", i)
-				}
+				assert.NotEmpty(t, chunk.ID, "chunk %d missing ID", i)
+				assert.NotEmpty(t, chunk.Content, "chunk %d missing content", i)
+				assert.Equal(t, tt.filePath, chunk.Metadata["path"],
+					"chunk %d wrong path", i)
+				assert.NotNil(t, chunk.Metadata["chunk_index"],
+					"chunk %d missing chunk_index", i)
+				assert.NotNil(t, chunk.Metadata["chunk_type"],
+					"chunk %d missing chunk_type", i)
 			}
 
 			// Verify chunk IDs are unique
 			ids := make(map[string]bool)
 			for i, chunk := range result {
-				if ids[chunk.ID] {
-					t.Errorf("chunkContent() duplicate chunk ID: %s at index %d", chunk.ID, i)
-				}
+				assert.False(t, ids[chunk.ID],
+					"duplicate chunk ID: %s at index %d", chunk.ID, i)
 				ids[chunk.ID] = true
 			}
 		})
@@ -302,26 +280,18 @@ func TestGenerateChunkID(t *testing.T) {
 			id2 := generateChunkID(tt.filePath, tt.chunkIndex)
 
 			// Should be consistent
-			if id1 != id2 {
-				t.Errorf("generateChunkID() inconsistent: %s != %s", id1, id2)
-			}
+			assert.Equal(t, id1, id2, "generateChunkID() inconsistent")
 
 			// Should be non-empty
-			if id1 == "" {
-				t.Errorf("generateChunkID() returned empty ID")
-			}
+			assert.NotEmpty(t, id1, "generateChunkID() returned empty ID")
 
 			// Different indices should produce different IDs
 			id3 := generateChunkID(tt.filePath, tt.chunkIndex+1)
-			if id1 == id3 {
-				t.Errorf("generateChunkID() same ID for different indices")
-			}
+			assert.NotEqual(t, id1, id3, "generateChunkID() same ID for different indices")
 
 			// Different paths should produce different IDs
 			id4 := generateChunkID(tt.filePath+"_different", tt.chunkIndex)
-			if id1 == id4 {
-				t.Errorf("generateChunkID() same ID for different paths")
-			}
+			assert.NotEqual(t, id1, id4, "generateChunkID() same ID for different paths")
 		})
 	}
 }
@@ -345,9 +315,7 @@ Some content in section 1 that should be chunked appropriately.
 Content in section 2 with more text to ensure proper chunking behavior.`
 
 	err := os.WriteFile(testFile, []byte(testContent), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	require.NoError(t, err, "Failed to create test file")
 
 	indexer := &ObsidianIndexer{
 		chunkSize:    100,
@@ -355,41 +323,22 @@ Content in section 2 with more text to ensure proper chunking behavior.`
 	}
 
 	chunks, fileInfo, err := indexer.processFileWithChunks(testFile)
-	if err != nil {
-		t.Fatalf("processFileWithChunks() error = %v", err)
-	}
+	require.NoError(t, err, "processFileWithChunks() error")
 
 	// Should have multiple chunks
-	if len(chunks) < 2 {
-		t.Errorf("processFileWithChunks() got %d chunks, want at least 2", len(chunks))
-	}
+	assert.GreaterOrEqual(t, len(chunks), 2, "expected at least 2 chunks")
 
 	// Verify file info
-	if fileInfo == nil {
-		t.Errorf("processFileWithChunks() returned nil fileInfo")
-	} else {
-		if fileInfo.ContentHash == "" {
-			t.Errorf("processFileWithChunks() missing content hash")
-		}
-		if fileInfo.ModTime().IsZero() {
-			t.Errorf("processFileWithChunks() missing modification time")
-		}
-	}
+	require.NotNil(t, fileInfo, "processFileWithChunks() returned nil fileInfo")
+	assert.NotEmpty(t, fileInfo.ContentHash, "missing content hash")
+	assert.False(t, fileInfo.ModTime().IsZero(), "missing modification time")
 
 	// Verify chunk structure
 	for i, chunk := range chunks {
-		if chunk.ID == "" {
-			t.Errorf("processFileWithChunks() chunk %d missing ID", i)
-		}
-		if chunk.Content == "" {
-			t.Errorf("processFileWithChunks() chunk %d missing content", i)
-		}
-		if chunk.Metadata["path"] != testFile {
-			t.Errorf("processFileWithChunks() chunk %d wrong path", i)
-		}
-		if chunk.Metadata["filename"] != "test.md" {
-			t.Errorf("processFileWithChunks() chunk %d wrong filename", i)
-		}
+		assert.NotEmpty(t, chunk.ID, "chunk %d missing ID", i)
+		assert.NotEmpty(t, chunk.Content, "chunk %d missing content", i)
+		assert.Equal(t, testFile, chunk.Metadata["path"], "chunk %d wrong path", i)
+		assert.Equal(t, "test.md", chunk.Metadata["filename"], "chunk %d wrong filename", i)
 	}
 }
 
@@ -411,16 +360,13 @@ func TestChunkSizeLimits(t *testing.T) {
 
 	chunks := indexer.chunkContent(largeContent.String(), "/test/large.md")
 
-	if len(chunks) < 5 {
-		t.Errorf("Expected multiple chunks for large document, got %d", len(chunks))
-	}
+	assert.GreaterOrEqual(t, len(chunks), 5, "expected multiple chunks for large document")
 
 	// Verify no chunk is excessively large (allowing some tolerance)
 	for i, chunk := range chunks {
-		if len(chunk.Content) > indexer.chunkSize*2 {
-			t.Errorf("Chunk %d too large: %d characters (limit: %d)",
-				i, len(chunk.Content), indexer.chunkSize)
-		}
+		assert.LessOrEqual(t, len(chunk.Content), indexer.chunkSize*2,
+			"chunk %d too large: %d characters (limit: %d)",
+			i, len(chunk.Content), indexer.chunkSize)
 	}
 }
 
