@@ -174,6 +174,7 @@ func (s *Server) handleSimilarity(w http.ResponseWriter, r *http.Request) {
 
 // extractQueryText extracts meaningful text from markdown content for querying
 func (s *Server) extractQueryText(content string) string {
+
 	// Remove YAML frontmatter
 	frontmatterRegex := regexp.MustCompile(`(?s)^---.*?---\s*`)
 	content = frontmatterRegex.ReplaceAllString(content, "")
@@ -202,8 +203,6 @@ func (s *Server) extractQueryText(content string) string {
 		}
 		content = result.String()
 	}
-
-	fmt.Println("Extracted Content:", content)
 	return content
 }
 
