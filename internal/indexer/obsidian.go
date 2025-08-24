@@ -481,6 +481,10 @@ func normalizeUnicode(text string) string {
 		text = strings.ReplaceAll(text, unicode, ascii)
 	}
 
+	// Remove mathematical bold/italic Unicode characters that cause tokenization issues
+	// These characters are commonly used in social media posts and can break ChromaDB embedding
+	text = normalizeMathematicalUnicode(text)
+
 	// Remove emojis that cause tokenization issues in ChromaDB
 	// Emojis are typically in Unicode ranges:
 	// - Emoticons: U+1F600–U+1F64F
@@ -511,6 +515,137 @@ func normalizeUnicode(text string) string {
 	}
 
 	return result
+}
+
+// normalizeMathematicalUnicode converts mathematical bold/italic Unicode characters
+// to their regular ASCII equivalents to prevent tokenization issues in ChromaDB
+func normalizeMathematicalUnicode(text string) string {
+	var result strings.Builder
+	result.Grow(len(text)) // Pre-allocate capacity
+
+	for _, r := range text {
+		// Convert mathematical Unicode characters to ASCII equivalents
+		if normalized := getMathematicalUnicodeReplacement(r); normalized != 0 {
+			result.WriteRune(normalized)
+		} else {
+			result.WriteRune(r)
+		}
+	}
+
+	return result.String()
+}
+
+// getMathematicalUnicodeReplacement returns the ASCII equivalent for mathematical Unicode characters
+// Returns 0 if the rune is not a mathematical Unicode character that needs replacement
+func getMathematicalUnicodeReplacement(r rune) rune {
+	switch {
+	// Mathematical Bold Capital Letters (U+1D400-U+1D419)
+	case r >= 0x1D400 && r <= 0x1D419:
+		return 'A' + (r - 0x1D400)
+	// Mathematical Bold Small Letters (U+1D41A-U+1D433)
+	case r >= 0x1D41A && r <= 0x1D433:
+		return 'a' + (r - 0x1D41A)
+	// Mathematical Bold Digits (U+1D7CE-U+1D7D7)
+	case r >= 0x1D7CE && r <= 0x1D7D7:
+		return '0' + (r - 0x1D7CE)
+
+	// Mathematical Italic Capital Letters (U+1D434-U+1D44D)
+	case r >= 0x1D434 && r <= 0x1D44D:
+		return 'A' + (r - 0x1D434)
+	// Mathematical Italic Small Letters (U+1D44E-U+1D467)
+	case r >= 0x1D44E && r <= 0x1D467:
+		return 'a' + (r - 0x1D44E)
+
+	// Mathematical Bold Italic Capital Letters (U+1D468-U+1D481)
+	case r >= 0x1D468 && r <= 0x1D481:
+		return 'A' + (r - 0x1D468)
+	// Mathematical Bold Italic Small Letters (U+1D482-U+1D49B)
+	case r >= 0x1D482 && r <= 0x1D49B:
+		return 'a' + (r - 0x1D482)
+
+	// Mathematical Script Capital Letters (U+1D49C-U+1D4B5)
+	case r >= 0x1D49C && r <= 0x1D4B5:
+		return 'A' + (r - 0x1D49C)
+	// Mathematical Script Small Letters (U+1D4B6-U+1D4CF)
+	case r >= 0x1D4B6 && r <= 0x1D4CF:
+		return 'a' + (r - 0x1D4B6)
+
+	// Mathematical Bold Script Capital Letters (U+1D4D0-U+1D4E9)
+	case r >= 0x1D4D0 && r <= 0x1D4E9:
+		return 'A' + (r - 0x1D4D0)
+	// Mathematical Bold Script Small Letters (U+1D4EA-U+1D503)
+	case r >= 0x1D4EA && r <= 0x1D503:
+		return 'a' + (r - 0x1D4EA)
+
+	// Mathematical Fraktur Capital Letters (U+1D504-U+1D51D)
+	case r >= 0x1D504 && r <= 0x1D51D:
+		return 'A' + (r - 0x1D504)
+	// Mathematical Fraktur Small Letters (U+1D51E-U+1D537)
+	case r >= 0x1D51E && r <= 0x1D537:
+		return 'a' + (r - 0x1D51E)
+
+	// Mathematical Double-Struck Capital Letters (U+1D538-U+1D551)
+	case r >= 0x1D538 && r <= 0x1D551:
+		return 'A' + (r - 0x1D538)
+	// Mathematical Double-Struck Small Letters (U+1D552-U+1D56B)
+	case r >= 0x1D552 && r <= 0x1D56B:
+		return 'a' + (r - 0x1D552)
+
+	// Mathematical Bold Fraktur Capital Letters (U+1D56C-U+1D585)
+	case r >= 0x1D56C && r <= 0x1D585:
+		return 'A' + (r - 0x1D56C)
+	// Mathematical Bold Fraktur Small Letters (U+1D586-U+1D59F)
+	case r >= 0x1D586 && r <= 0x1D59F:
+		return 'a' + (r - 0x1D586)
+
+	// Mathematical Sans-Serif Capital Letters (U+1D5A0-U+1D5B9)
+	case r >= 0x1D5A0 && r <= 0x1D5B9:
+		return 'A' + (r - 0x1D5A0)
+	// Mathematical Sans-Serif Small Letters (U+1D5BA-U+1D5D3)
+	case r >= 0x1D5BA && r <= 0x1D5D3:
+		return 'a' + (r - 0x1D5BA)
+
+	// Mathematical Sans-Serif Bold Capital Letters (U+1D5D4-U+1D5ED)
+	case r >= 0x1D5D4 && r <= 0x1D5ED:
+		return 'A' + (r - 0x1D5D4)
+	// Mathematical Sans-Serif Bold Small Letters (U+1D5EE-U+1D607)
+	case r >= 0x1D5EE && r <= 0x1D607:
+		return 'a' + (r - 0x1D5EE)
+
+	// Mathematical Sans-Serif Italic Capital Letters (U+1D608-U+1D621)
+	case r >= 0x1D608 && r <= 0x1D621:
+		return 'A' + (r - 0x1D608)
+	// Mathematical Sans-Serif Italic Small Letters (U+1D622-U+1D63B)
+	case r >= 0x1D622 && r <= 0x1D63B:
+		return 'a' + (r - 0x1D622)
+
+	// Mathematical Sans-Serif Bold Italic Capital Letters (U+1D63C-U+1D655)
+	case r >= 0x1D63C && r <= 0x1D655:
+		return 'A' + (r - 0x1D63C)
+	// Mathematical Sans-Serif Bold Italic Small Letters (U+1D656-U+1D66F)
+	case r >= 0x1D656 && r <= 0x1D66F:
+		return 'a' + (r - 0x1D656)
+
+	// Mathematical Monospace Capital Letters (U+1D670-U+1D689)
+	case r >= 0x1D670 && r <= 0x1D689:
+		return 'A' + (r - 0x1D670)
+	// Mathematical Monospace Small Letters (U+1D68A-U+1D6A3)
+	case r >= 0x1D68A && r <= 0x1D6A3:
+		return 'a' + (r - 0x1D68A)
+
+	// Mathematical Sans-Serif Digits (U+1D7E2-U+1D7EB)
+	case r >= 0x1D7E2 && r <= 0x1D7EB:
+		return '0' + (r - 0x1D7E2)
+	// Mathematical Sans-Serif Bold Digits (U+1D7EC-U+1D7F5)
+	case r >= 0x1D7EC && r <= 0x1D7F5:
+		return '0' + (r - 0x1D7EC)
+	// Mathematical Monospace Digits (U+1D7F6-U+1D7FF)
+	case r >= 0x1D7F6 && r <= 0x1D7FF:
+		return '0' + (r - 0x1D7F6)
+	}
+
+	// Return 0 to indicate no replacement needed
+	return 0
 }
 
 // removeEmojis removes emoji characters that cause tokenization issues in ChromaDB
