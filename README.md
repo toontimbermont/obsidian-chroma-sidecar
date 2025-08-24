@@ -23,23 +23,8 @@ An intelligent semantic search tool for your Obsidian vault, powered by ChromaDB
 1. **Clone and build:**
    ```bash
    git clone <repository-url>
-   cd obsidian-ai-agent
+   cd obsidian-chroma-sidecar
    mage installSidecar
-   ```
-
-2. **Start the auto-indexing sidecar:**
-   ```bash
-   # For vault in current directory
-   obsidian-chroma-sidecar
-
-   # For specific vault location
-   obsidian-chroma-sidecar -vault "/path/to/your/obsidian/vault" -dirs "Notes,Projects,Journal"
-   ```
-
-3. **Search your vault:**
-   ```bash
-   # While sidecar is running, use the test utility
-   obsidian-ai-chroma-test-util -query "project management techniques"
    ```
 
 ## Usage
@@ -55,27 +40,9 @@ The sidecar automatically:
 
 #### Basic Usage
 ```bash
-# Default settings (current directory, 5-minute intervals)
-obsidian-chroma-sidecar
+# Understand the CLI parameters
+obsidian-chroma-sidecar -h
 
-# Custom vault path
-obsidian-chroma-sidecar -vault "/Users/you/Documents/MyVault"
-
-# Custom directories and interval
-obsidian-chroma-sidecar -vault "/path/to/vault" -dirs "Notes,Projects,Archive" -interval "10m"
-```
-
-#### Configuration Options
-- `-vault`: Path to your Obsidian vault (default: current directory)
-- `-dirs`: Comma-separated list of folders to index (default: "Zettelkasten,Projects")
-- `-interval`: How often to re-index (default: "5m"). Examples: "30s", "10m", "1h"
-- `-host`: ChromaDB host (default: "localhost")
-- `-port`: ChromaDB port (default: 8037)
-- `-collection`: ChromaDB collection name (default: "notes")
-- `-batch`: Batch size for uploads (default: 50)
-
-#### Example Sessions
-```bash
 # For a typical Obsidian vault
 obsidian-chroma-sidecar -vault "/Users/you/Documents/ObsidianVault" -dirs "Daily Notes,Projects,Archive"
 
@@ -136,28 +103,10 @@ This tool works perfectly with Claude Code's Chroma MCP server:
 
 ## Development Commands
 
-If you're developing or customizing the tool:
+If you're developing or customizing the tool, use mage to get the list of supporting targets
 
 ```bash
-# Build binaries
-mage build        # Test utility
-mage buildSidecar  # Sidecar
-mage buildAll     # Both
-
-# Install to system
-mage install      # Test utility
-mage installSidecar # Sidecar
-mage installAll   # Both
-
-# Development
-mage dev          # Run test utility
-mage test         # Run tests
-mage check        # Format, lint, test
-
-# Manual ChromaDB management
-mage chroma:start    # Start ChromaDB
-mage chroma:stop     # Stop ChromaDB
-mage chroma:clear    # Clear all indexed data
+mage
 ```
 
 ## Troubleshooting

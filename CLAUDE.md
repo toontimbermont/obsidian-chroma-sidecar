@@ -18,7 +18,7 @@ This is an Obsidian AI Agent project built in Go, designed to integrate AI capab
    ```bash
    # For default vault (current directory)
    mage chroma:sidecar
-   
+
    # For specific vault with custom settings
    mage chroma:sidecarCustom "/path/to/your/vault" "notes,projects,journal" "10m"
    ```
@@ -30,7 +30,7 @@ This is an Obsidian AI Agent project built in Go, designed to integrate AI capab
    - ✅ Show progress in the terminal
    - ✅ Stop ChromaDB when you press `Ctrl-C`
 
-4. Use the search while daemon is running:
+4. Use the search while the sidecar is running:
    ```bash
    mage chroma:search "your search query"
    ```
@@ -71,7 +71,7 @@ This project uses [Mage](https://magefile.org/) for build automation. All comman
 - `mage format` - Format Go code
 - `mage lint` - Run golangci-lint (requires golangci-lint to be installed)
 - `mage mod` - Tidy go.mod and format code
-- `mage install` - Install test utility to GOPATH/bin  
+- `mage install` - Install test utility to GOPATH/bin
 - `mage installSidecar` - Install sidecar binary to GOPATH/bin
 - `mage installAll` - Install all binaries to GOPATH/bin
 - `mage` (no args) - List all available targets

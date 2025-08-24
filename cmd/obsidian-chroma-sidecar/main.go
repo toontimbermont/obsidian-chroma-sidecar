@@ -38,15 +38,15 @@ func main() {
 		batchSize  = flag.Int("batch", 50, "Batch size for document uploads")
 		httpPort   = flag.Int("http-port", 8087, "HTTP API server port (0 to disable)")
 		enableHTTP = flag.Bool("enable-http", true, "Enable HTTP API server")
-		clearOnly  = flag.Bool("clear", false, "Clear the collection and exit (does not start daemon)")
+		clearOnly  = flag.Bool("clear", false, "Clear the collection and exit (does not start the http server)")
 	)
 	flag.Parse()
 
 	if *clearOnly {
-		log.Printf("Starting Obsidian AI Daemon in clear-only mode")
+		log.Printf("Starting Obsidian Chroma Sidecar in clear-only mode")
 		log.Printf("Collection: %s", *collection)
 	} else {
-		log.Printf("Starting Obsidian AI Daemon")
+		log.Printf("Starting Obsidian Chroma Sidecar")
 		log.Printf("Vault: %s", *vaultPath)
 		log.Printf("Directories: %s", *dirs)
 		log.Printf("Reindex interval: %s", *interval)
@@ -140,7 +140,7 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Stopping daemon...")
+			log.Println("Stopping sidecar...")
 
 			// Stop HTTP server
 			if httpSrv != nil {
@@ -161,7 +161,7 @@ func main() {
 				log.Println("ChromaDB stopped successfully")
 			}
 
-			log.Println("Daemon stopped")
+			log.Println("Sidecar stopped")
 			os.Exit(0)
 
 		case <-ticker.C:
