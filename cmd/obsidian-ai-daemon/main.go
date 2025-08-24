@@ -38,17 +38,23 @@ func main() {
 		batchSize  = flag.Int("batch", 50, "Batch size for document uploads")
 		httpPort   = flag.Int("http-port", 8087, "HTTP API server port (0 to disable)")
 		enableHTTP = flag.Bool("enable-http", true, "Enable HTTP API server")
+		clearOnly  = flag.Bool("clear", false, "Clear the collection and exit (does not start daemon)")
 	)
 	flag.Parse()
 
-	log.Printf("Starting Obsidian AI Daemon")
-	log.Printf("Vault: %s", *vaultPath)
-	log.Printf("Directories: %s", *dirs)
-	log.Printf("Reindex interval: %s", *interval)
-	if *enableHTTP && *httpPort > 0 {
-		log.Printf("HTTP API enabled on port: %d", *httpPort)
+	if *clearOnly {
+		log.Printf("Starting Obsidian AI Daemon in clear-only mode")
+		log.Printf("Collection: %s", *collection)
 	} else {
-		log.Printf("HTTP API disabled")
+		log.Printf("Starting Obsidian AI Daemon")
+		log.Printf("Vault: %s", *vaultPath)
+		log.Printf("Directories: %s", *dirs)
+		log.Printf("Reindex interval: %s", *interval)
+		if *enableHTTP && *httpPort > 0 {
+			log.Printf("HTTP API enabled on port: %d", *httpPort)
+		} else {
+			log.Printf("HTTP API disabled")
+		}
 	}
 
 	// Set up signal handling for graceful shutdown
@@ -88,6 +94,14 @@ func main() {
 	}
 
 	log.Printf("Connected to ChromaDB at %s:%d, collection: %s", *host, *port, *collection)
+
+	// Handle clear-only mode
+	if *clearOnly {
+		if err := clearCollection(ctx, client, *collection, *vaultPath); err != nil {
+			log.Fatalf("Failed to clear collection: %v", err)
+		}
+		return
+	}
 
 	// Create indexer with default config and override specific values
 	indexerConfig := indexer.DefaultConfig()
@@ -262,6 +276,43 @@ func performIndexing(ctx context.Context, indexer *indexer.ObsidianIndexer, dire
 				break
 			}
 		}
+	}
+
+	return nil
+}
+
+func clearCollection(ctx context.Context, client *chroma.Client, collectionName, vaultPath string) error {
+	// Get document count before clearing
+	count, err := client.GetDocumentCount(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get document count: %w", err)
+	}
+
+	if count == 0 {
+		log.Printf("Collection '%s' is already empty", collectionName)
+		return nil
+	}
+
+	log.Printf("Found %d documents in collection '%s'", count, collectionName)
+
+	// Clear the collection
+	err = client.ClearCollection(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to clear collection: %w", err)
+	}
+
+	log.Printf("Successfully cleared %d documents from collection '%s'", count, collectionName)
+
+	// Remove the index tracking file
+	indexFile := filepath.Join(vaultPath, ".obsidian_index.json")
+	if _, err := os.Stat(indexFile); err == nil {
+		if err := os.Remove(indexFile); err != nil {
+			log.Printf("Warning: Failed to remove index tracking file %s: %v", indexFile, err)
+		} else {
+			log.Printf("Removed index tracking file: %s", indexFile)
+		}
+	} else {
+		log.Printf("Index tracking file does not exist: %s", indexFile)
 	}
 
 	return nil
