@@ -6,7 +6,7 @@ An intelligent semantic search tool for your Obsidian vault, powered by ChromaDB
 
 - 🔍 **Semantic Search**: Find notes by meaning, not just keywords
 - 🚀 **Incremental Indexing**: Only processes new/changed files for lightning-fast updates
-- 🤖 **Auto-Indexing Daemon**: Automatically keeps your vault indexed with configurable intervals
+- 🤖 **Auto-Indexing Sidecar**: Automatically keeps your vault indexed with configurable intervals
 - 🐳 **Docker Integration**: Automatically manages ChromaDB container
 - 🛠️ **Developer Tools**: Built-in test utilities and debugging tools
 
@@ -24,31 +24,31 @@ An intelligent semantic search tool for your Obsidian vault, powered by ChromaDB
    ```bash
    git clone <repository-url>
    cd obsidian-ai-agent
-   mage installDaemon
+   mage installSidecar
    ```
 
-2. **Start the auto-indexing daemon:**
+2. **Start the auto-indexing sidecar:**
    ```bash
    # For vault in current directory
-   obsidian-ai-daemon
-   
+   obsidian-chroma-sidecar
+
    # For specific vault location
-   obsidian-ai-daemon -vault "/path/to/your/obsidian/vault" -dirs "Notes,Projects,Journal"
+   obsidian-chroma-sidecar -vault "/path/to/your/obsidian/vault" -dirs "Notes,Projects,Journal"
    ```
 
 3. **Search your vault:**
    ```bash
-   # While daemon is running, use the test utility
+   # While sidecar is running, use the test utility
    obsidian-ai-chroma-test-util -query "project management techniques"
    ```
 
 ## Usage
 
-### Auto-Indexing Daemon
+### Auto-Indexing Sidecar
 
-The daemon automatically:
+The sidecar automatically:
 - ✅ Starts ChromaDB if not already running
-- ✅ Performs initial indexing of your vault  
+- ✅ Performs initial indexing of your vault
 - ✅ Re-indexes every 5 minutes (configurable)
 - ✅ Shows indexing progress in real-time
 - ✅ Stops ChromaDB when you press `Ctrl-C`
@@ -56,13 +56,13 @@ The daemon automatically:
 #### Basic Usage
 ```bash
 # Default settings (current directory, 5-minute intervals)
-obsidian-ai-daemon
+obsidian-chroma-sidecar
 
 # Custom vault path
-obsidian-ai-daemon -vault "/Users/you/Documents/MyVault"
+obsidian-chroma-sidecar -vault "/Users/you/Documents/MyVault"
 
 # Custom directories and interval
-obsidian-ai-daemon -vault "/path/to/vault" -dirs "Notes,Projects,Archive" -interval "10m"
+obsidian-chroma-sidecar -vault "/path/to/vault" -dirs "Notes,Projects,Archive" -interval "10m"
 ```
 
 #### Configuration Options
@@ -77,18 +77,18 @@ obsidian-ai-daemon -vault "/path/to/vault" -dirs "Notes,Projects,Archive" -inter
 #### Example Sessions
 ```bash
 # For a typical Obsidian vault
-obsidian-ai-daemon -vault "/Users/you/Documents/ObsidianVault" -dirs "Daily Notes,Projects,Archive"
+obsidian-chroma-sidecar -vault "/Users/you/Documents/ObsidianVault" -dirs "Daily Notes,Projects,Archive"
 
 # For frequent updates (every 2 minutes)
-obsidian-ai-daemon -interval "2m"
+obsidian-chroma-sidecar -interval "2m"
 
 # For large vaults (bigger batches)
-obsidian-ai-daemon -batch 100
+obsidian-chroma-sidecar -batch 100
 ```
 
 ### Search Your Vault
 
-While the daemon is running, use the test utility to search:
+While the sidecar is running, use the test utility to search:
 
 ```bash
 # Basic search
@@ -101,9 +101,9 @@ obsidian-ai-chroma-test-util -query "team management" -results 10
 obsidian-ai-chroma-test-util -query "project ideas" -collection "notes"
 ```
 
-### Stopping the Daemon
+### Stopping the Sidecar
 
-Press `Ctrl-C` to stop the daemon. It will:
+Press `Ctrl-C` to stop the sidecar. It will:
 1. Stop the indexing process gracefully
 2. Stop the ChromaDB container
 3. Exit cleanly
@@ -130,9 +130,9 @@ The tool creates a `.obsidian_index.json` file in your vault directory to track 
 
 This tool works perfectly with Claude Code's Chroma MCP server:
 
-1. **Start the daemon** to keep your vault indexed
+1. **Start the sidecar** to keep your vault indexed
 2. **Use Claude Code** with Chroma MCP to search and interact with your notes
-3. **Let the daemon** handle all the indexing automatically in the background
+3. **Let the sidecar** handle all the indexing automatically in the background
 
 ## Development Commands
 
@@ -141,12 +141,12 @@ If you're developing or customizing the tool:
 ```bash
 # Build binaries
 mage build        # Test utility
-mage buildDaemon  # Daemon
+mage buildSidecar  # Sidecar
 mage buildAll     # Both
 
 # Install to system
-mage install      # Test utility  
-mage installDaemon # Daemon
+mage install      # Test utility
+mage installSidecar # Sidecar
 mage installAll   # Both
 
 # Development
@@ -167,7 +167,7 @@ mage chroma:clear    # Clear all indexed data
 - Check that port 8037 is not in use by another application
 - Try `docker ps` to see if ChromaDB container is running
 
-### Indexing Issues  
+### Indexing Issues
 - Check that your vault path is correct
 - Ensure the specified directories exist in your vault
 - Look for permission issues if files can't be read
@@ -180,7 +180,7 @@ mage chroma:clear    # Clear all indexed data
 ### Getting Help
 - Check logs for specific error messages
 - Use the test utility to verify ChromaDB connectivity
-- Restart the daemon if you encounter issues
+- Restart the sidecar if you encounter issues
 
 ## Architecture
 

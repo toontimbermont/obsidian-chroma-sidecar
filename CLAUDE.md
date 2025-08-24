@@ -8,22 +8,22 @@ This is an Obsidian AI Agent project built in Go, designed to integrate AI capab
 
 ## Quick Start (Easy Installation)
 
-### Install the Auto-Indexing Daemon
-1. Install the daemon to your system:
+### Install the Auto-Indexing Sidecar
+1. Install the sidecar to your system:
    ```bash
-   mage installDaemon
+   mage installSidecar
    ```
 
-2. Start the daemon for your Obsidian vault:
+2. Start the sidecar for your Obsidian vault:
    ```bash
    # For default vault (current directory)
-   mage chroma:daemon
+   mage chroma:sidecar
    
    # For specific vault with custom settings
-   mage chroma:daemonCustom "/path/to/your/vault" "notes,projects,journal" "10m"
+   mage chroma:sidecarCustom "/path/to/your/vault" "notes,projects,journal" "10m"
    ```
 
-3. The daemon will:
+3. The sidecar will:
    - ✅ Start ChromaDB automatically if not running
    - ✅ Perform initial indexing of your vault
    - ✅ Re-index every 5 minutes (or your custom interval)
@@ -41,7 +41,7 @@ This project uses [Mage](https://magefile.org/) for build automation. All comman
 
 ### Essential Commands
 - `mage build` - Build the test utility to `bin/obsidian-ai-chroma-test-util`
-- `mage buildDaemon` - Build the daemon binary to `bin/obsidian-ai-daemon`
+- `mage buildSidecar` - Build the sidecar binary to `bin/obsidian-chroma-sidecar`
 - `mage buildAll` - Build all binaries
 - `mage dev` - Run the test utility in development mode
 - `mage check` - Run all pre-commit checks (format, lint, test)
@@ -60,11 +60,11 @@ This project uses [Mage](https://magefile.org/) for build automation. All comman
 - `mage chroma:clear` - Clear all documents from ChromaDB collection
 - `mage chroma:stop` - Stop ChromaDB Docker container
 
-### Daemon Commands (Auto-Indexing)
-- `mage chroma:daemon` - Start auto-indexing daemon (default: 5min intervals)
-- `mage chroma:daemonCustom vault_path folders interval` - Start daemon with custom settings
-  - Example: `mage chroma:daemonCustom "/path/to/vault" "notes,docs" "10m"`
-- Press `Ctrl-C` to stop daemon (automatically stops ChromaDB)
+### Sidecar Commands (Auto-Indexing)
+- `mage chroma:sidecar` - Start auto-indexing sidecar (default: 5min intervals)
+- `mage chroma:sidecarCustom vault_path folders interval` - Start sidecar with custom settings
+  - Example: `mage chroma:sidecarCustom "/path/to/vault" "notes,docs" "10m"`
+- Press `Ctrl-C` to stop sidecar (automatically stops ChromaDB)
 
 ### Other Commands
 - `mage clean` - Remove build artifacts
@@ -72,13 +72,13 @@ This project uses [Mage](https://magefile.org/) for build automation. All comman
 - `mage lint` - Run golangci-lint (requires golangci-lint to be installed)
 - `mage mod` - Tidy go.mod and format code
 - `mage install` - Install test utility to GOPATH/bin  
-- `mage installDaemon` - Install daemon binary to GOPATH/bin
+- `mage installSidecar` - Install sidecar binary to GOPATH/bin
 - `mage installAll` - Install all binaries to GOPATH/bin
 - `mage` (no args) - List all available targets
 
 ### Go Commands
 - `go run ./cmd/obsidian-ai-chroma-test-util` - Run test utility directly with Go
-- `go run ./cmd/obsidian-ai-daemon` - Run daemon directly with Go
+- `go run ./cmd/obsidian-chroma-sidecar` - Run sidecar directly with Go
 - `go mod tidy` - Tidy dependencies
 
 ## Architecture
@@ -87,7 +87,7 @@ Standard Go project layout with semantic search capabilities:
 
 ### Core Components
 - `cmd/obsidian-ai-chroma-test-util/` - ChromaDB test utility (search & debug)
-- `cmd/obsidian-ai-daemon/` - Auto-indexing daemon
+- `cmd/obsidian-chroma-sidecar/` - Auto-indexing sidecar
 - `cmd/reindex/` - Vault reindexing utility
 - `cmd/clear-collection/` - Collection management utility
 - `internal/chroma/` - ChromaDB client wrapper

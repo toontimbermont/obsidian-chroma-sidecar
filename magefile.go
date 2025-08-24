@@ -20,10 +20,10 @@ func Build() error {
 	return sh.Run("go", "build", "-o", "bin/obsidian-ai-chroma-test-util", "./cmd/obsidian-ai-chroma-test-util")
 }
 
-// BuildDaemon builds the daemon binary
-func BuildDaemon() error {
-	fmt.Println("Building daemon...")
-	return sh.Run("go", "build", "-o", "bin/obsidian-ai-daemon", "./cmd/obsidian-ai-daemon")
+// BuildSidecar builds the sidecar binary
+func BuildSidecar() error {
+	fmt.Println("Building sidecar...")
+	return sh.Run("go", "build", "-o", "bin/obsidian-chroma-sidecar", "./cmd/obsidian-chroma-sidecar")
 }
 
 // BuildSimilarityServer builds the similarity server binary
@@ -35,7 +35,7 @@ func BuildSimilarityServer() error {
 // BuildAll builds all binaries
 func BuildAll() error {
 	fmt.Println("Building all binaries...")
-	mg.Deps(Build, BuildDaemon, BuildSimilarityServer)
+	mg.Deps(Build, BuildSidecar, BuildSimilarityServer)
 	return nil
 }
 
@@ -103,11 +103,11 @@ func Install() error {
 	return sh.RunV("go", "install", "./cmd/obsidian-ai-chroma-test-util")
 }
 
-// InstallDaemon installs the daemon binary to GOPATH/bin
-func InstallDaemon() error {
-	mg.Deps(BuildDaemon)
-	fmt.Println("Installing daemon...")
-	return sh.RunV("go", "install", "./cmd/obsidian-ai-daemon")
+// InstallSidecar installs the sidecar binary to GOPATH/bin
+func InstallSidecar() error {
+	mg.Deps(BuildSidecar)
+	fmt.Println("Installing sidecar...")
+	return sh.RunV("go", "install", "./cmd/obsidian-chroma-sidecar")
 }
 
 // InstallSimilarityServer installs the similarity server binary to GOPATH/bin
@@ -120,7 +120,7 @@ func InstallSimilarityServer() error {
 // InstallAll installs all binaries to GOPATH/bin
 func InstallAll() error {
 	fmt.Println("Installing all binaries...")
-	mg.Deps(Install, InstallDaemon, InstallSimilarityServer)
+	mg.Deps(Install, InstallSidecar, InstallSimilarityServer)
 	return nil
 }
 
@@ -189,14 +189,14 @@ func (Chroma) Search(query string) error {
 	return sh.RunV("go", "run", "./cmd/obsidian-ai-chroma-test-util", "-query", query)
 }
 
-// Daemon runs the auto-indexing daemon with default parameters
-func (Chroma) Daemon() error {
-	fmt.Println("Starting Obsidian AI Daemon...")
-	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-vault", ".", "-dirs", "Zettelkasten,Projects")
+// Sidecar runs the auto-indexing sidecar with default parameters
+func (Chroma) Sidecar() error {
+	fmt.Println("Starting Obsidian Chroma Sidecar...")
+	return sh.RunV("go", "run", "./cmd/obsidian-chroma-sidecar", "-vault", ".", "-dirs", "Zettelkasten,Projects")
 }
 
-// DaemonCustom runs the auto-indexing daemon with custom parameters
-func (Chroma) DaemonCustom(vault, dirs, interval string) error {
+// SidecarCustom runs the auto-indexing sidecar with custom parameters
+func (Chroma) SidecarCustom(vault, dirs, interval string) error {
 	if vault == "" {
 		vault = "."
 	}
@@ -207,24 +207,24 @@ func (Chroma) DaemonCustom(vault, dirs, interval string) error {
 		interval = "5m"
 	}
 
-	fmt.Printf("Starting daemon for vault: %s, dirs: %s, interval: %s\n", vault, dirs, interval)
-	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-vault", vault, "-dirs", dirs, "-interval", interval)
+	fmt.Printf("Starting sidecar for vault: %s, dirs: %s, interval: %s\n", vault, dirs, interval)
+	return sh.RunV("go", "run", "./cmd/obsidian-chroma-sidecar", "-vault", vault, "-dirs", dirs, "-interval", interval)
 }
 
-// DaemonWithHTTP runs the daemon with HTTP API on a custom port
-func (Chroma) DaemonWithHTTP(httpPort string) error {
+// SidecarWithHTTP runs the sidecar with HTTP API on a custom port
+func (Chroma) SidecarWithHTTP(httpPort string) error {
 	if httpPort == "" {
 		httpPort = "8080"
 	}
 
-	fmt.Printf("Starting daemon with HTTP API on port: %s\n", httpPort)
-	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-http-port", httpPort, "-enable-http")
+	fmt.Printf("Starting sidecar with HTTP API on port: %s\n", httpPort)
+	return sh.RunV("go", "run", "./cmd/obsidian-chroma-sidecar", "-http-port", httpPort, "-enable-http")
 }
 
-// DaemonNoHTTP runs the daemon without HTTP API
-func (Chroma) DaemonNoHTTP() error {
-	fmt.Println("Starting daemon without HTTP API...")
-	return sh.RunV("go", "run", "./cmd/obsidian-ai-daemon", "-enable-http=false")
+// SidecarNoHTTP runs the sidecar without HTTP API
+func (Chroma) SidecarNoHTTP() error {
+	fmt.Println("Starting sidecar without HTTP API...")
+	return sh.RunV("go", "run", "./cmd/obsidian-chroma-sidecar", "-enable-http=false")
 }
 
 func init() {
