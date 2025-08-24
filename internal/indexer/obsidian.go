@@ -13,11 +13,9 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
+	"github.com/mozillazg/go-unidecode"
 
 	"obsidian-ai-agent/internal/chroma"
 )
@@ -243,48 +241,6 @@ func (idx *ObsidianIndexer) findMarkdownFiles(directories []string) ([]string, e
 	return files, nil
 }
 
-// processFile processes a single markdown file
-func (idx *ObsidianIndexer) processFile(filePath string) (*chroma.Document, error) {
-	// Read file content
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	// Skip empty files
-	if len(content) == 0 {
-		return nil, nil
-	}
-
-	// Ensure content is valid UTF-8
-	contentStr := string(content)
-	if !utf8.ValidString(contentStr) {
-		// Try to clean invalid UTF-8
-		contentStr = strings.ToValidUTF8(contentStr, "")
-	}
-
-	// Skip files that are too short
-	if len(strings.TrimSpace(contentStr)) < 10 {
-		return nil, nil
-	}
-
-	// Generate document ID from file path
-	docID := generateDocumentID(filePath)
-
-	// Extract metadata
-	metadata := map[string]interface{}{
-		"path":     filePath,
-		"filename": filepath.Base(filePath),
-		"folder":   filepath.Dir(filePath),
-	}
-
-	return &chroma.Document{
-		ID:       docID,
-		Content:  contentStr,
-		Metadata: metadata,
-	}, nil
-}
-
 // FileWithHash extends os.FileInfo with content hash
 type FileWithHash struct {
 	os.FileInfo
@@ -358,73 +314,6 @@ func (idx *ObsidianIndexer) fileNeedsIndexing(filePath string) (bool, error) {
 	return false, nil // File unchanged, skip indexing
 }
 
-// processFileWithHash processes a file and returns the document with file info including content hash
-func (idx *ObsidianIndexer) processFileWithHash(filePath string) (*chroma.Document, *FileWithHash, error) {
-	// Read file content
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read file: %w", err)
-	}
-
-	// Get file info
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to stat file: %w", err)
-	}
-
-	// Calculate content hash
-	contentHash := fmt.Sprintf("%x", sha256.Sum256(content))
-
-	// Create FileWithHash
-	fileWithHash := &FileWithHash{
-		FileInfo:    fileInfo,
-		ContentHash: contentHash,
-	}
-
-	// Skip empty files
-	if len(content) == 0 {
-		return nil, fileWithHash, nil
-	}
-
-	// Ensure content is valid UTF-8
-	contentStr := string(content)
-	if !utf8.ValidString(contentStr) {
-		// Try to clean invalid UTF-8
-		contentStr = strings.ToValidUTF8(contentStr, "")
-	}
-
-	// Skip files that are too short
-	if len(strings.TrimSpace(contentStr)) < 10 {
-		return nil, fileWithHash, nil
-	}
-
-	// Generate document ID from file path
-	docID := generateDocumentID(filePath)
-
-	// Extract metadata
-	metadata := map[string]interface{}{
-		"path":     filePath,
-		"filename": filepath.Base(filePath),
-		"folder":   filepath.Dir(filePath),
-	}
-
-	return &chroma.Document{
-		ID:       docID,
-		Content:  contentStr,
-		Metadata: metadata,
-	}, fileWithHash, nil
-}
-
-// generateDocumentID creates a unique ID for a document based on its file path
-func generateDocumentID(filePath string) string {
-	// Clean and normalize the path
-	cleanPath := filepath.Clean(filePath)
-
-	// Create MD5 hash of the path for consistent ID generation
-	hash := md5.Sum([]byte(cleanPath))
-	return fmt.Sprintf("%x", hash)
-}
-
 // generateChunkID creates a unique ID for a chunk based on file path and chunk index
 func generateChunkID(filePath string, chunkIndex int) string {
 	// Clean and normalize the path
@@ -440,281 +329,20 @@ func generateChunkID(filePath string, chunkIndex int) string {
 	return fmt.Sprintf("%x", hash)
 }
 
-// normalizeUnicode converts Unicode accented characters to their ASCII equivalents
+// normalizeUnicode converts Unicode characters to their ASCII equivalents
 // This ensures consistent tokenization across different languages and prevents
 // tensor shape mismatches in ChromaDB embedding
 func normalizeUnicode(text string) string {
-	// First, handle typographic punctuation characters that cause tokenization issues
-	// These are not combining marks, so NFD normalization won't handle them
-	typographicReplacements := map[string]string{
-		// Smart quotes
-		"\u201C": "\"", // Left double quotation mark (U+201C)
-		"\u201D": "\"", // Right double quotation mark (U+201D)
-		"\u2018": "'",  // Left single quotation mark (U+2018)
-		"\u2019": "'",  // Right single quotation mark (U+2019)
+	// Use go-unidecode to convert all Unicode characters to ASCII equivalents
+	// This handles accented characters, mathematical symbols, emojis, and other
+	// Unicode characters that could cause tokenization issues in ChromaDB
+	result := unidecode.Unidecode(text)
 
-		// Dashes
-		"\u2013": "-", // En dash (U+2013)
-		"\u2014": "-", // Em dash (U+2014)
+	// Clean up multiple spaces that may result from emoji/Unicode replacement
+	result = regexp.MustCompile(`\s+`).ReplaceAllString(result, " ")
 
-		// Other common typographic characters
-		"\u2026": "...",  // Horizontal ellipsis (U+2026)
-		"\u2022": "*",    // Bullet (U+2022)
-		"\u00A9": "(c)",  // Copyright sign (U+00A9)
-		"\u00AE": "(r)",  // Registered sign (U+00AE)
-		"\u2122": "(tm)", // Trademark sign (U+2122)
-
-		// Non-breaking spaces and similar
-		"\u00A0": " ", // Non-breaking space (U+00A0)
-		"\u2000": " ", // En quad (U+2000)
-		"\u2001": " ", // Em quad (U+2001)
-		"\u2002": " ", // En space (U+2002)
-		"\u2003": " ", // Em space (U+2003)
-		"\u2004": " ", // Three-per-em space (U+2004)
-		"\u2005": " ", // Four-per-em space (U+2005)
-		"\u2006": " ", // Six-per-em space (U+2006)
-		"\u200B": "",  // Zero width space (U+200B)
-	}
-
-	// Apply typographic character replacements
-	for unicode, ascii := range typographicReplacements {
-		text = strings.ReplaceAll(text, unicode, ascii)
-	}
-
-	// Remove mathematical bold/italic Unicode characters that cause tokenization issues
-	// These characters are commonly used in social media posts and can break ChromaDB embedding
-	text = normalizeMathematicalUnicode(text)
-
-	// Remove emojis that cause tokenization issues in ChromaDB
-	// Emojis are typically in Unicode ranges:
-	// - Emoticons: U+1F600–U+1F64F
-	// - Miscellaneous Symbols: U+1F300–U+1F5FF
-	// - Transport and Map Symbols: U+1F680–U+1F6FF
-	// - Additional Emoticons: U+1F900–U+1F9FF
-	// - Symbols and Pictographs: U+1F1E6–U+1F1FF (flags)
-	// And many others scattered throughout Unicode
-	text = removeEmojis(text)
-
-	// Then apply Unicode normalization to remove diacritics (accents)
-	// This transforms accented characters like 'é', 'è', 'ë' to their base form 'e'
-	//
-	// The process:
-	// 1. NFD (Normalization Form Decomposed) - separates base characters from combining marks
-	// 2. RemoveFunc - removes nonspacing marks (accents, diacritics)
-	// 3. NFC (Normalization Form Composed) - recomposes the remaining characters
-
-	isMn := func(r rune) bool {
-		return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks (diacritics)
-	}
-
-	t := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
-	result, _, err := transform.String(t, text)
-	if err != nil {
-		// Fallback to original text if transformation fails
-		return text
-	}
-
-	return result
-}
-
-// normalizeMathematicalUnicode converts mathematical bold/italic Unicode characters
-// to their regular ASCII equivalents to prevent tokenization issues in ChromaDB
-func normalizeMathematicalUnicode(text string) string {
-	var result strings.Builder
-	result.Grow(len(text)) // Pre-allocate capacity
-
-	for _, r := range text {
-		// Convert mathematical Unicode characters to ASCII equivalents
-		if normalized := getMathematicalUnicodeReplacement(r); normalized != 0 {
-			result.WriteRune(normalized)
-		} else {
-			result.WriteRune(r)
-		}
-	}
-
-	return result.String()
-}
-
-// getMathematicalUnicodeReplacement returns the ASCII equivalent for mathematical Unicode characters
-// Returns 0 if the rune is not a mathematical Unicode character that needs replacement
-func getMathematicalUnicodeReplacement(r rune) rune {
-	switch {
-	// Mathematical Bold Capital Letters (U+1D400-U+1D419)
-	case r >= 0x1D400 && r <= 0x1D419:
-		return 'A' + (r - 0x1D400)
-	// Mathematical Bold Small Letters (U+1D41A-U+1D433)
-	case r >= 0x1D41A && r <= 0x1D433:
-		return 'a' + (r - 0x1D41A)
-	// Mathematical Bold Digits (U+1D7CE-U+1D7D7)
-	case r >= 0x1D7CE && r <= 0x1D7D7:
-		return '0' + (r - 0x1D7CE)
-
-	// Mathematical Italic Capital Letters (U+1D434-U+1D44D)
-	case r >= 0x1D434 && r <= 0x1D44D:
-		return 'A' + (r - 0x1D434)
-	// Mathematical Italic Small Letters (U+1D44E-U+1D467)
-	case r >= 0x1D44E && r <= 0x1D467:
-		return 'a' + (r - 0x1D44E)
-
-	// Mathematical Bold Italic Capital Letters (U+1D468-U+1D481)
-	case r >= 0x1D468 && r <= 0x1D481:
-		return 'A' + (r - 0x1D468)
-	// Mathematical Bold Italic Small Letters (U+1D482-U+1D49B)
-	case r >= 0x1D482 && r <= 0x1D49B:
-		return 'a' + (r - 0x1D482)
-
-	// Mathematical Script Capital Letters (U+1D49C-U+1D4B5)
-	case r >= 0x1D49C && r <= 0x1D4B5:
-		return 'A' + (r - 0x1D49C)
-	// Mathematical Script Small Letters (U+1D4B6-U+1D4CF)
-	case r >= 0x1D4B6 && r <= 0x1D4CF:
-		return 'a' + (r - 0x1D4B6)
-
-	// Mathematical Bold Script Capital Letters (U+1D4D0-U+1D4E9)
-	case r >= 0x1D4D0 && r <= 0x1D4E9:
-		return 'A' + (r - 0x1D4D0)
-	// Mathematical Bold Script Small Letters (U+1D4EA-U+1D503)
-	case r >= 0x1D4EA && r <= 0x1D503:
-		return 'a' + (r - 0x1D4EA)
-
-	// Mathematical Fraktur Capital Letters (U+1D504-U+1D51D)
-	case r >= 0x1D504 && r <= 0x1D51D:
-		return 'A' + (r - 0x1D504)
-	// Mathematical Fraktur Small Letters (U+1D51E-U+1D537)
-	case r >= 0x1D51E && r <= 0x1D537:
-		return 'a' + (r - 0x1D51E)
-
-	// Mathematical Double-Struck Capital Letters (U+1D538-U+1D551)
-	case r >= 0x1D538 && r <= 0x1D551:
-		return 'A' + (r - 0x1D538)
-	// Mathematical Double-Struck Small Letters (U+1D552-U+1D56B)
-	case r >= 0x1D552 && r <= 0x1D56B:
-		return 'a' + (r - 0x1D552)
-
-	// Mathematical Bold Fraktur Capital Letters (U+1D56C-U+1D585)
-	case r >= 0x1D56C && r <= 0x1D585:
-		return 'A' + (r - 0x1D56C)
-	// Mathematical Bold Fraktur Small Letters (U+1D586-U+1D59F)
-	case r >= 0x1D586 && r <= 0x1D59F:
-		return 'a' + (r - 0x1D586)
-
-	// Mathematical Sans-Serif Capital Letters (U+1D5A0-U+1D5B9)
-	case r >= 0x1D5A0 && r <= 0x1D5B9:
-		return 'A' + (r - 0x1D5A0)
-	// Mathematical Sans-Serif Small Letters (U+1D5BA-U+1D5D3)
-	case r >= 0x1D5BA && r <= 0x1D5D3:
-		return 'a' + (r - 0x1D5BA)
-
-	// Mathematical Sans-Serif Bold Capital Letters (U+1D5D4-U+1D5ED)
-	case r >= 0x1D5D4 && r <= 0x1D5ED:
-		return 'A' + (r - 0x1D5D4)
-	// Mathematical Sans-Serif Bold Small Letters (U+1D5EE-U+1D607)
-	case r >= 0x1D5EE && r <= 0x1D607:
-		return 'a' + (r - 0x1D5EE)
-
-	// Mathematical Sans-Serif Italic Capital Letters (U+1D608-U+1D621)
-	case r >= 0x1D608 && r <= 0x1D621:
-		return 'A' + (r - 0x1D608)
-	// Mathematical Sans-Serif Italic Small Letters (U+1D622-U+1D63B)
-	case r >= 0x1D622 && r <= 0x1D63B:
-		return 'a' + (r - 0x1D622)
-
-	// Mathematical Sans-Serif Bold Italic Capital Letters (U+1D63C-U+1D655)
-	case r >= 0x1D63C && r <= 0x1D655:
-		return 'A' + (r - 0x1D63C)
-	// Mathematical Sans-Serif Bold Italic Small Letters (U+1D656-U+1D66F)
-	case r >= 0x1D656 && r <= 0x1D66F:
-		return 'a' + (r - 0x1D656)
-
-	// Mathematical Monospace Capital Letters (U+1D670-U+1D689)
-	case r >= 0x1D670 && r <= 0x1D689:
-		return 'A' + (r - 0x1D670)
-	// Mathematical Monospace Small Letters (U+1D68A-U+1D6A3)
-	case r >= 0x1D68A && r <= 0x1D6A3:
-		return 'a' + (r - 0x1D68A)
-
-	// Mathematical Sans-Serif Digits (U+1D7E2-U+1D7EB)
-	case r >= 0x1D7E2 && r <= 0x1D7EB:
-		return '0' + (r - 0x1D7E2)
-	// Mathematical Sans-Serif Bold Digits (U+1D7EC-U+1D7F5)
-	case r >= 0x1D7EC && r <= 0x1D7F5:
-		return '0' + (r - 0x1D7EC)
-	// Mathematical Monospace Digits (U+1D7F6-U+1D7FF)
-	case r >= 0x1D7F6 && r <= 0x1D7FF:
-		return '0' + (r - 0x1D7F6)
-	}
-
-	// Return 0 to indicate no replacement needed
-	return 0
-}
-
-// removeEmojis removes emoji characters that cause tokenization issues in ChromaDB
-// This function removes characters from common emoji Unicode ranges to ensure
-// consistent tokenization and prevent tensor shape mismatches
-func removeEmojis(text string) string {
-	var result strings.Builder
-	result.Grow(len(text)) // Pre-allocate capacity
-
-	for _, r := range text {
-		// Check if the rune is an emoji by testing common Unicode ranges
-		if isEmoji(r) {
-			// Skip emoji characters (remove them)
-			continue
-		}
-		result.WriteRune(r)
-	}
-
-	// Clean up multiple spaces that may result from emoji removal
-	cleaned := result.String()
-	cleaned = regexp.MustCompile(`\s+`).ReplaceAllString(cleaned, " ")
-	return strings.TrimSpace(cleaned)
-}
-
-// isEmoji checks if a rune is an emoji character
-// This covers the most common emoji Unicode ranges that cause tokenization issues
-func isEmoji(r rune) bool {
-	// Emoticons (U+1F600–U+1F64F)
-	if r >= 0x1F600 && r <= 0x1F64F {
-		return true
-	}
-
-	// Miscellaneous Symbols and Pictographs (U+1F300–U+1F5FF)
-	if r >= 0x1F300 && r <= 0x1F5FF {
-		return true
-	}
-
-	// Transport and Map Symbols (U+1F680–U+1F6FF)
-	if r >= 0x1F680 && r <= 0x1F6FF {
-		return true
-	}
-
-	// Additional Emoticons (U+1F900–U+1F9FF)
-	if r >= 0x1F900 && r <= 0x1F9FF {
-		return true
-	}
-
-	// Symbols and Pictographs Extended-A (U+1FA70–U+1FAFF)
-	if r >= 0x1FA70 && r <= 0x1FAFF {
-		return true
-	}
-
-	// Regional Indicator Symbols (flags) (U+1F1E6–U+1F1FF)
-	if r >= 0x1F1E6 && r <= 0x1F1FF {
-		return true
-	}
-
-	// Some additional common emoji ranges
-	// Miscellaneous Symbols (U+2600–U+26FF) - includes ☕
-	if r >= 0x2600 && r <= 0x26FF {
-		return true
-	}
-
-	// Dingbats (U+2700–U+27BF)
-	if r >= 0x2700 && r <= 0x27BF {
-		return true
-	}
-
-	return false
+	// Trim leading/trailing whitespace
+	return strings.TrimSpace(result)
 }
 
 // processFileWithChunks processes a file and returns chunks with file info including content hash
